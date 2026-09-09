@@ -1,140 +1,283 @@
-import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { ArrowLeft, Upload, FileText, Wand2, Loader2, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { analyzeCandidate } from '../lib/ai'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
-import { Card } from '../components/ui/Card'
 
 export function NewCandidatePage() {
   const { profile } = useAuth()
   const navigate = useNavigate()
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [offers, setOffers] = useState<{ id: string; title: string }[]>([])
+  const [searchParams] = useSearchParams()
+  const preselectedJobId = searchParams.get('offre')
+
+  const [cvFile, setCvFile] = useState<File | null>(null)
+  const [coverFile, setCoverFile] = useState<File | null>(null)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [analyzed, setAnalyzed] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [jobOffer, setJobOffer] = useState<{ id: string; title: string; company: string; description?: string; skills?: string; experience?: string } | null>(null)
+  const [jobOffers, setJobOffers] = useState<{ id: string; title: string; company: string }[]>([])
+  const [selectedJobId, setSelectedJobId] = useState(preselectedJobId || '')
+
   const [form, setForm] = useState({
-    first_name: '', last_name: '', email: '', phone: '',
-    location: '', job_offer_id: '', cv_text: '', cover_letter_text: '',
+    first_name: '', last_name: '', email: '', phone: '', location: '',
   })
+  const [aiData, setAiData] = useState<Record<string, unknown> | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!profile?.organization_id) return
-    supabase.from('job_offers')
-      .select('id, title')
-      .eq('organization_id', profile.organization_id)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
-      .then(({ data }) => setOffers(data || []))
-  }, [profile?.organization_id])
-
-  const set = (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-    setForm(f => ({ ...f, [field]: e.target.value }))
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!profile?.organization_id) return
-    if (!form.first_name.trim() || !form.last_name.trim()) {
-      setError('Le prénom et le nom sont obligatoires.')
-      return
+    const load = async () => {
+      if (!profile?.organization_id) return
+      const { data } = await supabase.from('job_offers').select('id, title, company, description, skills, experience')
+        .eq('organization_id', profile.organization_id).eq('status', 'active')
+      if (data) setJobOffers(data)
+      if (preselectedJobId && data) {
+        const found = data.find(j => j.id === preselectedJobId)
+        if (found) setJobOffer(found)
+      }
     }
-    setLoading(true)
-    const { data, error } = await supabase.from('candidates').insert({
+    load()
+  }, [profile?.organization_id, preselectedJobId])
+
+  useEffect(() => {
+    if (selectedJobId) {
+      const found = jobOffers.find(j => j.id === selectedJobId) || null
+      setJobOffer(found)
+    } else {
+      setJobOffer(null)
+    }
+  }, [selectedJobId, jobOffers])
+
+  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
+
+  const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve((reader.result as string).split(',')[1])
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+
+  const runAnalysis = async () => {
+    if (!cvFile) return
+    setAnalyzing(true)
+    setError('')
+    try {
+      const params: Record<string, unknown> = { job_offer: jobOffer || undefined }
+      if (cvFile.type === 'application/pdf') {
+        params.cv_base64 = await fileToBase64(cvFile)
+        params.cv_media_type = 'application/pdf'
+      } else {
+        params.cv_text = await cvFile.text()
+      }
+      if (coverFile) {
+        params.cover_letter_text = await coverFile.text()
+      }
+
+      const data = await analyzeCandidate(params as Parameters<typeof analyzeCandidate>[0])
+      setAiData(data)
+      setForm({
+        first_name: data.first_name || '',
+        last_name: data.last_name || '',
+        email: data.email || '',
+        phone: data.phone || '',
+        location: data.location || '',
+      })
+      setAnalyzed(true)
+    } catch {
+      setError("Analyse impossible. Vérifiez le format du fichier ou renseignez les informations manuellement.")
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
+  const handleSave = async () => {
+    if (!form.first_name || !form.last_name) { setError('Prénom et nom requis.'); return }
+    if (!profile?.organization_id) return
+    setSaving(true)
+
+    let cvUrl: string | null = null
+    if (cvFile) {
+      const ext = cvFile.name.split('.').pop()
+      const path = `${profile.organization_id}/${Date.now()}.${ext}`
+      const { error: upErr } = await supabase.storage.from('cvs').upload(path, cvFile)
+      if (!upErr) {
+        const { data: urlData } = supabase.storage.from('cvs').getPublicUrl(path)
+        cvUrl = urlData.publicUrl
+      }
+    }
+
+    const payload: Record<string, unknown> = {
+      ...form,
       organization_id: profile.organization_id,
-      first_name: form.first_name,
-      last_name: form.last_name,
-      email: form.email || null,
-      phone: form.phone || null,
-      location: form.location || null,
-      job_offer_id: form.job_offer_id || null,
-      cv_text: form.cv_text || null,
-      cover_letter_text: form.cover_letter_text || null,
+      job_offer_id: selectedJobId || null,
       status: 'new',
-    }).select('id').single()
-    setLoading(false)
-    if (error) { setError('Erreur lors de l\'ajout. Veuillez réessayer.'); return }
+      cv_file_url: cvUrl,
+    }
+
+    if (aiData) {
+      Object.assign(payload, {
+        score_global: aiData.score_global,
+        score_skills: aiData.score_skills,
+        score_experience: aiData.score_experience,
+        score_education: aiData.score_education,
+        score_job_match: aiData.score_job_match,
+        score_letter: aiData.score_letter,
+        recommendation: aiData.recommendation,
+        ai_summary: aiData.ai_summary,
+        ai_strengths: aiData.ai_strengths,
+        ai_weaknesses: aiData.ai_weaknesses,
+        missing_skills: aiData.missing_skills,
+        progression: aiData.progression || 20,
+        cv_text: typeof aiData.cv_text === 'string' ? aiData.cv_text : undefined,
+        status: 'analyzed',
+      })
+    }
+
+    const { data, error: err } = await supabase.from('candidates').insert(payload).select().single()
+    if (err) { setError('Erreur lors de la sauvegarde.'); setSaving(false); return }
     navigate(`/candidats/${data.id}`)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragOver(false)
+    const file = e.dataTransfer.files[0]
+    if (file) setCvFile(file)
   }
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-3xl mx-auto">
-      <Link to="/candidats" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800 mb-6">
-        <ArrowLeft size={16} /> Retour aux candidats
-      </Link>
+      <div className="flex items-center gap-4 mb-8">
+        <Link to="/candidats" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800">
+          <ArrowLeft size={16} /> Retour
+        </Link>
+        <h1 className="text-2xl font-bold text-slate-900">Ajouter un candidat</h1>
+      </div>
 
-      <h1 className="text-2xl font-bold text-slate-900 mb-8">Ajouter un candidat</h1>
+      {/* Job offer selector */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-6">
+        <h2 className="font-bold text-slate-900 mb-3">Offre associée</h2>
+        <select
+          value={selectedJobId}
+          onChange={e => setSelectedJobId(e.target.value)}
+          className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+        >
+          <option value="">Sans offre associée</option>
+          {jobOffers.map(j => <option key={j.id} value={j.id}>{j.title} — {j.company}</option>)}
+        </select>
+      </div>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-        <Card>
-          <h2 className="font-bold text-slate-900 mb-5">Informations personnelles</h2>
-          <div className="flex flex-col gap-4">
-            <div className="grid grid-cols-2 gap-4">
-              <Input label="Prénom *" placeholder="Jean" value={form.first_name} onChange={set('first_name')} required />
-              <Input label="Nom *" placeholder="Dupont" value={form.last_name} onChange={set('last_name')} required />
+      {/* CV Upload */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-6">
+        <h2 className="font-bold text-slate-900 mb-4">CV du candidat</h2>
+        <div
+          onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+          onClick={() => fileRef.current?.click()}
+          className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${
+            dragOver ? 'border-blue-400 bg-blue-50' : cvFile ? 'border-green-300 bg-green-50' : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+          }`}
+        >
+          <input ref={fileRef} type="file" accept=".pdf,.txt,.doc,.docx" onChange={e => setCvFile(e.target.files?.[0] || null)} className="hidden" />
+          {cvFile ? (
+            <div className="flex items-center justify-center gap-3">
+              <FileText size={24} className="text-green-600" />
+              <span className="font-medium text-green-700">{cvFile.name}</span>
+              <button onClick={e => { e.stopPropagation(); setCvFile(null); setAnalyzed(false) }} className="text-slate-400 hover:text-red-500">
+                <X size={16} />
+              </button>
             </div>
-            <Input label="Email" type="email" placeholder="jean.dupont@email.com" value={form.email} onChange={set('email')} />
-            <div className="grid sm:grid-cols-2 gap-4">
-              <Input label="Téléphone" placeholder="+33 6 00 00 00 00" value={form.phone} onChange={set('phone')} />
-              <Input label="Localisation" placeholder="Paris, France" value={form.location} onChange={set('location')} />
-            </div>
+          ) : (
+            <>
+              <Upload size={32} className="mx-auto text-slate-300 mb-3" />
+              <p className="font-medium text-slate-700">Glissez le CV ou cliquez pour sélectionner</p>
+              <p className="text-xs text-slate-400 mt-1">PDF, TXT, DOC — max 10 Mo</p>
+            </>
+          )}
+        </div>
+
+        {/* Optional cover letter */}
+        {cvFile && (
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-slate-700 mb-2">Lettre de motivation (optionnel)</label>
+            <input type="file" accept=".pdf,.txt" onChange={e => setCoverFile(e.target.files?.[0] || null)}
+              className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
           </div>
-        </Card>
-
-        <Card>
-          <h2 className="font-bold text-slate-900 mb-5">Poste concerné</h2>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700">Offre d'emploi</label>
-            <select
-              value={form.job_offer_id}
-              onChange={set('job_offer_id')}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600"
-            >
-              <option value="">Sélectionner une offre...</option>
-              {offers.map(o => <option key={o.id} value={o.id}>{o.title}</option>)}
-            </select>
-            {offers.length === 0 && (
-              <p className="text-xs text-slate-500">
-                Aucune offre active.{' '}
-                <Link to="/offres/nouvelle" className="text-blue-600 hover:underline">Créer une offre</Link>
-              </p>
-            )}
-          </div>
-        </Card>
-
-        <Card>
-          <h2 className="font-bold text-slate-900 mb-5">Documents</h2>
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-slate-700">CV (texte)</label>
-              <textarea
-                rows={8}
-                placeholder="Collez le texte du CV ici pour que l'IA puisse l'analyser..."
-                value={form.cv_text}
-                onChange={set('cv_text')}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 resize-none focus:outline-none focus:ring-2 focus:ring-blue-600 font-mono"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-slate-700">Lettre de motivation (texte)</label>
-              <textarea
-                rows={5}
-                placeholder="Collez la lettre de motivation ici..."
-                value={form.cover_letter_text}
-                onChange={set('cover_letter_text')}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 resize-none focus:outline-none focus:ring-2 focus:ring-blue-600"
-              />
-            </div>
-          </div>
-        </Card>
-
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">{error}</div>
         )}
 
-        <Button type="submit" size="lg" loading={loading} className="w-full">
-          Ajouter le candidat
-        </Button>
-      </form>
+        {cvFile && (
+          <div className="mt-4 flex items-center gap-3">
+            <Button onClick={runAnalysis} disabled={analyzing}>
+              {analyzing ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />}
+              {analyzing ? 'Analyse IA en cours...' : 'Analyser avec l\'IA'}
+            </Button>
+            {analyzed && <span className="text-sm text-green-600 font-medium">✓ Informations extraites</span>}
+          </div>
+        )}
+
+        {analyzing && (
+          <div className="mt-4 bg-blue-50 rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <Loader2 size={18} className="animate-spin text-blue-600" />
+              <div>
+                <p className="text-sm font-medium text-blue-900">Analyse en cours...</p>
+                <p className="text-xs text-blue-600 mt-0.5">Extraction des informations et calcul des scores</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {analyzed && aiData && (
+          <div className="mt-4 grid grid-cols-3 gap-3">
+            {[
+              { label: 'Score global', value: aiData.score_global as number },
+              { label: 'Compétences', value: aiData.score_skills as number },
+              { label: 'Expérience', value: aiData.score_experience as number },
+            ].map(s => s.value !== null && s.value !== undefined && (
+              <div key={s.label} className="bg-slate-50 rounded-xl p-3 text-center">
+                <p className={`text-2xl font-bold ${(s.value as number) >= 75 ? 'text-green-600' : (s.value as number) >= 50 ? 'text-orange-500' : 'text-red-500'}`}>
+                  {s.value as number}
+                </p>
+                <p className="text-xs text-slate-500">{s.label}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3 mb-6">{error}</div>
+      )}
+
+      {/* Candidate info form */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
+        <h2 className="font-bold text-slate-900">Informations du candidat</h2>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Input label="Prénom *" value={form.first_name} onChange={e => set('first_name', e.target.value)} required autoComplete="off" />
+          <Input label="Nom *" value={form.last_name} onChange={e => set('last_name', e.target.value)} required autoComplete="off" />
+        </div>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Input label="Email" type="email" value={form.email} onChange={e => set('email', e.target.value)} autoComplete="off" />
+          <Input label="Téléphone" value={form.phone} onChange={e => set('phone', e.target.value)} autoComplete="off" />
+        </div>
+        <Input label="Localisation" value={form.location} onChange={e => set('location', e.target.value)} placeholder="Ville, Pays" autoComplete="off" />
+
+        <div className="pt-4 border-t border-slate-100 flex gap-3">
+          <Button onClick={handleSave} loading={saving} disabled={!form.first_name || !form.last_name}>
+            Ajouter le candidat
+          </Button>
+          <Link to="/candidats">
+            <Button variant="secondary">Annuler</Button>
+          </Link>
+        </div>
+      </div>
     </div>
   )
 }

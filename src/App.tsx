@@ -11,11 +11,14 @@ import { OnboardingPage } from './pages/OnboardingPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { OffersPage } from './pages/OffersPage'
 import { NewOfferPage } from './pages/NewOfferPage'
+import { OfferDetailPage } from './pages/OfferDetailPage'
 import { CandidatesPage } from './pages/CandidatesPage'
 import { NewCandidatePage } from './pages/NewCandidatePage'
 import { CandidateDetailPage } from './pages/CandidateDetailPage'
 import { InterviewsPage } from './pages/InterviewsPage'
+import { CalendarPage } from './pages/CalendarPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { PublicInterviewPage } from './pages/PublicInterviewPage'
 
 function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const { profile, loading } = useAuth()
@@ -77,7 +80,7 @@ function AppRoutes() {
         <ProtectedRoute>
           <OnboardingGuard>
             <AppLayout>
-              <OffersPage />
+              <OfferDetailPage />
             </AppLayout>
           </OnboardingGuard>
         </ProtectedRoute>
@@ -123,6 +126,16 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
 
+      <Route path="/calendrier" element={
+        <ProtectedRoute>
+          <OnboardingGuard>
+            <AppLayout>
+              <CalendarPage />
+            </AppLayout>
+          </OnboardingGuard>
+        </ProtectedRoute>
+      } />
+
       <Route path="/parametres" element={
         <ProtectedRoute>
           <OnboardingGuard>
@@ -142,6 +155,9 @@ function AppRoutes() {
           </OnboardingGuard>
         </ProtectedRoute>
       } />
+
+      {/* Public candidate interview page */}
+      <Route path="/c/:token" element={<PublicInterviewPage />} />
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />

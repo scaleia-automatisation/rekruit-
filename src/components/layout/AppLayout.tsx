@@ -11,7 +11,7 @@ const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/offres', icon: Briefcase, label: 'Offres' },
   { to: '/candidats', icon: Users, label: 'Candidats' },
-  { to: '/entretiens', icon: CalendarDays, label: 'Entretiens' },
+  { to: '/calendrier', icon: CalendarDays, label: 'Calendrier' },
   { to: '/parametres', icon: Settings, label: 'Paramètres' },
 ]
 

@@ -1,10 +1,18 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Mail, Phone, MapPin, Star, CheckCircle, XCircle, CalendarPlus, Trash2 } from 'lucide-react'
+import {
+  ArrowLeft, Mail, Phone, MapPin, Star, CheckCircle, XCircle, CalendarPlus, Trash2,
+  Wand2, Loader2, Send
+} from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { generateMessage } from '../lib/ai'
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { Card } from '../components/ui/Card'
+import { AIAnalysisPanel } from '../components/ai/AIAnalysisPanel'
+import { ScoreDisplay } from '../components/ai/ScoreDisplay'
+import { SlotPicker, type Slot } from '../components/interviews/SlotPicker'
+import { MessageEditor } from '../components/interviews/MessageEditor'
 
 type CandidateStatus = 'new' | 'analyzing' | 'analyzed' | 'shortlisted' | 'interview_1' | 'interview_2' | 'interview_3' | 'offer' | 'hired' | 'rejected' | 'pool'
 
@@ -20,14 +28,29 @@ interface Candidate {
   score_skills: number | null
   score_experience: number | null
   score_education: number | null
+  score_job_match: number | null
+  score_letter: number | null
   progression: number | null
   recommendation: string | null
   ai_summary: string | null
   ai_strengths: string | null
   ai_weaknesses: string | null
+  missing_skills: string | null
   cv_text: string | null
+  cv_file_url: string | null
   job_offer_id: string | null
-  job_offer?: { title: string; company: string } | null
+  job_offer?: { id: string; title: string; company: string; description?: string; skills?: string; experience?: string } | null
+}
+
+interface Interview {
+  id: string
+  interview_number: number
+  status: string
+  scheduled_at: string | null
+  score: number | null
+  ai_summary: string | null
+  recommendation: string | null
+  slots?: { id: string; slot_datetime: string | null; label: string | null; status: string | null }[]
 }
 
 const statusConfig: Record<string, { label: string; variant: 'blue' | 'green' | 'orange' | 'red' | 'gray' | 'purple' }> = {
@@ -46,32 +69,46 @@ const statusConfig: Record<string, { label: string; variant: 'blue' | 'green' | 
 
 const pipeline: CandidateStatus[] = ['new', 'analyzed', 'shortlisted', 'interview_1', 'interview_2', 'interview_3', 'hired']
 
+type Tab = 'info' | 'ai' | 'cv' | 'entretiens' | 'decision'
+
 export function CandidateDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [candidate, setCandidate] = useState<Candidate | null>(null)
+  const [interviews, setInterviews] = useState<Interview[]>([])
   const [loading, setLoading] = useState(true)
   const [statusLoading, setStatusLoading] = useState(false)
+  const [tab, setTab] = useState<Tab>('info')
+
+  // Interview scheduling state
+  const [showSchedule, setShowSchedule] = useState(false)
+  const [scheduleFor, setScheduleFor] = useState<1 | 2 | 3>(1)
+  const [slots, setSlots] = useState<Slot[]>([])
+  const [msgSubject, setMsgSubject] = useState('')
+  const [msgBody, setMsgBody] = useState('')
+  const [genMsg, setGenMsg] = useState(false)
+  const [scheduleSaving, setScheduleSaving] = useState(false)
 
   useEffect(() => {
-    const fetch = async () => {
+    const load = async () => {
       if (!id) return
-      const { data } = await supabase
-        .from('candidates')
-        .select('*, job_offer:job_offers(title, company)')
-        .eq('id', id)
-        .single()
-      setCandidate(data as any)
+      const [{ data: c }, { data: iv }] = await Promise.all([
+        supabase.from('candidates').select('*, job_offer:job_offers(id, title, company, description, skills, experience)').eq('id', id).single(),
+        supabase.from('interviews').select('*, slots:interview_slots(*)').eq('candidate_id', id).order('interview_number'),
+      ])
+      setCandidate(c as Candidate)
+      setInterviews((iv || []) as Interview[])
       setLoading(false)
     }
-    fetch()
+    load()
   }, [id])
 
   const updateStatus = async (status: CandidateStatus) => {
     if (!candidate) return
     setStatusLoading(true)
-    const { data } = await supabase.from('candidates').update({ status }).eq('id', candidate.id).select().single()
-    if (data) setCandidate(c => c ? { ...c, status: data.status } : c)
+    const progression = { new: 0, analyzing: 10, analyzed: 20, shortlisted: 30, interview_1: 40, interview_2: 60, interview_3: 80, offer: 90, hired: 100, rejected: 0, pool: 20 }[status] || 0
+    const { data } = await supabase.from('candidates').update({ status, progression }).eq('id', candidate.id).select().single()
+    if (data) setCandidate(c => c ? { ...c, status: data.status, progression: data.progression } : c)
     setStatusLoading(false)
   }
 
@@ -81,8 +118,72 @@ export function CandidateDetailPage() {
     navigate('/candidats')
   }
 
-  const scoreColor = (s: number) => s >= 75 ? 'text-green-600' : s >= 50 ? 'text-orange-500' : 'text-red-500'
-  const scoreBg = (s: number) => s >= 75 ? 'bg-green-500' : s >= 50 ? 'bg-orange-500' : 'bg-red-500'
+  const openSchedule = async (num: 1 | 2 | 3) => {
+    setScheduleFor(num)
+    setSlots([])
+    setMsgSubject('')
+    setMsgBody('')
+    setShowSchedule(true)
+  }
+
+  const generateMsg = async () => {
+    if (!candidate?.job_offer || slots.length === 0) return
+    setGenMsg(true)
+    try {
+      const origin = window.location.origin
+      const link = `${origin}/c/[TOKEN]`
+      const result = await generateMessage({
+        type: 'interview_invitation',
+        candidate: { first_name: candidate.first_name, last_name: candidate.last_name },
+        job_offer: { title: candidate.job_offer.title, company: candidate.job_offer.company },
+        slots,
+        interview_link: link,
+      })
+      setMsgSubject(result.subject)
+      setMsgBody(result.message)
+    } finally {
+      setGenMsg(false)
+    }
+  }
+
+  const saveSchedule = async () => {
+    if (!candidate || slots.length === 0) return
+    setScheduleSaving(true)
+    const { data: interview } = await supabase.from('interviews').insert({
+      candidate_id: candidate.id,
+      job_offer_id: candidate.job_offer_id,
+      organization_id: (candidate as unknown as { organization_id: string }).organization_id,
+      interview_number: scheduleFor,
+      status: 'pending',
+    }).select().single()
+
+    if (interview) {
+      await supabase.from('interview_slots').insert(
+        slots.map(s => ({ interview_id: interview.id, slot_datetime: s.datetime, label: s.label, status: 'pending' }))
+      )
+      const { data: token } = await supabase.from('interview_tokens').insert({
+        interview_id: interview.id,
+        status: 'pending',
+      }).select().single()
+
+      await updateStatus(`interview_${scheduleFor}` as CandidateStatus)
+      if (token) {
+        await supabase.from('messages').insert({
+          candidate_id: candidate.id,
+          organization_id: (candidate as unknown as { organization_id: string }).organization_id,
+          type: 'email',
+          subject: msgSubject,
+          body: msgBody,
+          status: 'sent',
+        }).then(() => {})
+      }
+
+      const { data: ivList } = await supabase.from('interviews').select('*, slots:interview_slots(*)').eq('candidate_id', candidate.id).order('interview_number')
+      setInterviews((ivList || []) as Interview[])
+    }
+    setScheduleSaving(false)
+    setShowSchedule(false)
+  }
 
   if (loading) {
     return (
@@ -102,6 +203,13 @@ export function CandidateDetailPage() {
 
   const st = statusConfig[candidate.status] || { label: candidate.status, variant: 'gray' as const }
   const currentPipelineStep = pipeline.indexOf(candidate.status as CandidateStatus)
+  const tabs: { id: Tab; label: string }[] = [
+    { id: 'info', label: 'Infos' },
+    { id: 'ai', label: 'Analyse IA' },
+    { id: 'cv', label: 'CV' },
+    { id: 'entretiens', label: `Entretiens (${interviews.length})` },
+    { id: 'decision', label: 'Décision' },
+  ]
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
@@ -118,40 +226,44 @@ export function CandidateDetailPage() {
       <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-6">
         <div className="flex flex-col sm:flex-row sm:items-start gap-4">
           <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center shrink-0">
-            <span className="text-blue-700 text-2xl font-bold">
-              {candidate.first_name[0]}{candidate.last_name[0]}
-            </span>
+            <span className="text-blue-700 text-2xl font-bold">{candidate.first_name[0]}{candidate.last_name[0]}</span>
           </div>
           <div className="flex-1">
             <div className="flex flex-wrap items-center gap-3 mb-2">
-              <h1 className="text-2xl font-bold text-slate-900">
-                {candidate.first_name} {candidate.last_name}
-              </h1>
+              <h1 className="text-2xl font-bold text-slate-900">{candidate.first_name} {candidate.last_name}</h1>
               <Badge variant={st.variant} size="md">{st.label}</Badge>
             </div>
             {candidate.job_offer && (
-              <p className="text-slate-500 mb-3">{candidate.job_offer.title} — {candidate.job_offer.company}</p>
+              <Link to={`/offres/${candidate.job_offer.id}`} className="text-slate-500 hover:text-blue-600 mb-3 block text-sm">
+                {candidate.job_offer.title} — {candidate.job_offer.company}
+              </Link>
             )}
             <div className="flex flex-wrap gap-4 text-sm text-slate-500">
               {candidate.email && <a href={`mailto:${candidate.email}`} className="flex items-center gap-1.5 hover:text-blue-600"><Mail size={14} />{candidate.email}</a>}
               {candidate.phone && <a href={`tel:${candidate.phone}`} className="flex items-center gap-1.5 hover:text-blue-600"><Phone size={14} />{candidate.phone}</a>}
               {candidate.location && <span className="flex items-center gap-1.5"><MapPin size={14} />{candidate.location}</span>}
             </div>
+            {candidate.progression !== null && (
+              <div className="mt-3">
+                <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+                  <span>Progression</span>
+                  <span className="font-medium">{candidate.progression}%</span>
+                </div>
+                <div className="w-full bg-slate-100 rounded-full h-1.5">
+                  <div className="h-1.5 rounded-full bg-blue-500 transition-all" style={{ width: `${candidate.progression}%` }} />
+                </div>
+              </div>
+            )}
           </div>
           {candidate.score_global !== null && (
-            <div className="text-center bg-slate-50 rounded-2xl p-4 min-w-[80px]">
-              <p className={`text-4xl font-extrabold ${scoreColor(candidate.score_global)}`}>
-                {candidate.score_global}
-              </p>
-              <p className="text-xs text-slate-400 mt-1">Score IA</p>
-            </div>
+            <ScoreDisplay score={candidate.score_global} />
           )}
         </div>
       </div>
 
       {/* Pipeline progress */}
       <Card className="mb-6">
-        <h2 className="font-bold text-slate-900 mb-4">Progression</h2>
+        <h2 className="font-bold text-slate-900 mb-4">Pipeline</h2>
         <div className="flex items-center gap-1 overflow-x-auto pb-1">
           {pipeline.map((s, i) => {
             const sc = statusConfig[s]
@@ -162,128 +274,278 @@ export function CandidateDetailPage() {
                 <button
                   onClick={() => updateStatus(s)}
                   disabled={statusLoading}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                    active ? 'bg-blue-600 text-white' :
-                    done ? 'bg-green-100 text-green-700' :
-                    'bg-slate-100 text-slate-500 hover:bg-slate-200'
-                  }`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${active ? 'bg-blue-600 text-white' : done ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
                 >
                   {sc.label}
                 </button>
-                {i < pipeline.length - 1 && (
-                  <div className={`w-4 h-0.5 ${done ? 'bg-green-400' : 'bg-slate-200'}`} />
-                )}
+                {i < pipeline.length - 1 && <div className={`w-4 h-0.5 ${done ? 'bg-green-400' : 'bg-slate-200'}`} />}
               </div>
             )
           })}
         </div>
-        <div className="mt-4 flex gap-3">
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => updateStatus('rejected')}
-            disabled={statusLoading || candidate.status === 'rejected'}
-          >
-            <XCircle size={15} className="text-red-500" />
-            Refuser
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Button size="sm" variant="secondary" onClick={() => updateStatus('rejected')} disabled={statusLoading || candidate.status === 'rejected'}>
+            <XCircle size={15} className="text-red-500" /> Refuser
           </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => updateStatus('shortlisted')}
-            disabled={statusLoading || candidate.status === 'shortlisted'}
-          >
-            <CheckCircle size={15} className="text-green-500" />
-            Retenir
+          <Button size="sm" variant="secondary" onClick={() => updateStatus('shortlisted')} disabled={statusLoading || candidate.status === 'shortlisted'}>
+            <CheckCircle size={15} className="text-green-500" /> Retenir
           </Button>
-          <Button
-            size="sm"
-            onClick={() => updateStatus('interview_1')}
-            disabled={statusLoading}
-          >
-            <CalendarPlus size={15} />
-            Proposer entretien
+          <Button size="sm" onClick={() => openSchedule(interviews.length < 1 ? 1 : interviews.length < 2 ? 2 : 3)} disabled={statusLoading}>
+            <CalendarPlus size={15} /> Planifier entretien
           </Button>
         </div>
       </Card>
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* AI Analysis */}
-        {candidate.ai_summary && (
-          <Card>
-            <h2 className="font-bold text-slate-900 mb-4">Analyse IA</h2>
-            <p className="text-sm text-slate-600 leading-relaxed mb-5">{candidate.ai_summary}</p>
-            {candidate.score_skills !== null && (
-              <div className="space-y-3">
-                {[
-                  { label: 'Compétences', score: candidate.score_skills },
-                  { label: 'Expérience', score: candidate.score_experience },
-                  { label: 'Formation', score: candidate.score_education },
-                ].map(({ label, score }) => score !== null && (
-                  <div key={label}>
-                    <div className="flex justify-between text-xs text-slate-600 mb-1">
-                      <span>{label}</span>
-                      <span className={`font-bold ${scoreColor(score)}`}>{score}/100</span>
-                    </div>
-                    <div className="w-full bg-slate-100 rounded-full h-2">
-                      <div className={`h-2 rounded-full ${scoreBg(score)}`} style={{ width: `${score}%` }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
-        )}
-
-        {/* Strengths & Weaknesses */}
-        {(candidate.ai_strengths || candidate.ai_weaknesses) && (
-          <div className="flex flex-col gap-4">
-            {candidate.ai_strengths && (
-              <Card>
-                <h3 className="font-bold text-green-700 mb-3 flex items-center gap-2">
-                  <CheckCircle size={16} /> Points forts
-                </h3>
-                <p className="text-sm text-slate-600 leading-relaxed">{candidate.ai_strengths}</p>
-              </Card>
-            )}
-            {candidate.ai_weaknesses && (
-              <Card>
-                <h3 className="font-bold text-orange-700 mb-3 flex items-center gap-2">
-                  <Star size={16} /> Points à améliorer
-                </h3>
-                <p className="text-sm text-slate-600 leading-relaxed">{candidate.ai_weaknesses}</p>
-              </Card>
-            )}
-          </div>
-        )}
-
-        {/* CV text */}
-        {candidate.cv_text && (
-          <div className="lg:col-span-2">
-            <Card>
-              <h2 className="font-bold text-slate-900 mb-4">CV</h2>
-              <pre className="text-xs text-slate-600 whitespace-pre-wrap font-mono leading-relaxed max-h-64 overflow-y-auto">
-                {candidate.cv_text}
-              </pre>
-            </Card>
-          </div>
-        )}
-
-        {/* Empty state for AI */}
-        {!candidate.ai_summary && candidate.status === 'new' && (
-          <div className="lg:col-span-2">
-            <Card>
-              <div className="text-center py-6">
-                <div className="text-4xl mb-3">🤖</div>
-                <h3 className="font-bold text-slate-900 mb-2">Analyse IA non lancée</h3>
-                <p className="text-sm text-slate-500">
-                  L'analyse IA sera disponible dès que vous configurez votre intégration LLM.
-                </p>
-              </div>
-            </Card>
-          </div>
-        )}
+      {/* Tabs */}
+      <div className="border-b border-slate-200 mb-6 overflow-x-auto">
+        <div className="flex gap-1">
+          {tabs.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-all whitespace-nowrap ${
+                tab === t.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
+
+      {/* Tab content */}
+      {tab === 'info' && (
+        <div className="grid sm:grid-cols-2 gap-4">
+          {candidate.job_offer && (
+            <Card>
+              <h3 className="font-bold text-slate-900 mb-3">Poste ciblé</h3>
+              <p className="font-medium text-slate-700">{candidate.job_offer.title}</p>
+              <p className="text-sm text-slate-500">{candidate.job_offer.company}</p>
+            </Card>
+          )}
+          <Card>
+            <h3 className="font-bold text-slate-900 mb-3">Statut du recrutement</h3>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-slate-500">Statut actuel</span>
+                <Badge variant={st.variant}>{st.label}</Badge>
+              </div>
+              {candidate.progression !== null && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-500">Progression</span>
+                  <span className="font-medium text-slate-900">{candidate.progression}%</span>
+                </div>
+              )}
+              {candidate.recommendation && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-500">Recommandation IA</span>
+                  <span className={`font-bold text-sm ${candidate.recommendation === 'GO' ? 'text-green-600' : candidate.recommendation === 'MAYBE' ? 'text-orange-500' : 'text-red-500'}`}>
+                    {candidate.recommendation === 'GO' ? '🟢 GO' : candidate.recommendation === 'MAYBE' ? '🟡 MAYBE' : '🔴 NO'}
+                  </span>
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {tab === 'ai' && (
+        candidate.ai_summary ? (
+          <AIAnalysisPanel
+            ai_summary={candidate.ai_summary}
+            ai_strengths={candidate.ai_strengths}
+            ai_weaknesses={candidate.ai_weaknesses}
+            missing_skills={candidate.missing_skills}
+            recommendation={candidate.recommendation}
+            score_skills={candidate.score_skills}
+            score_experience={candidate.score_experience}
+            score_education={candidate.score_education}
+            score_job_match={candidate.score_job_match}
+            score_letter={candidate.score_letter}
+          />
+        ) : (
+          <Card>
+            <div className="text-center py-8">
+              <div className="text-4xl mb-3">🤖</div>
+              <h3 className="font-bold text-slate-900 mb-2">Analyse IA non disponible</h3>
+              <p className="text-sm text-slate-500">Importez un CV et lancez l'analyse IA lors de l'ajout du candidat.</p>
+            </div>
+          </Card>
+        )
+      )}
+
+      {tab === 'cv' && (
+        candidate.cv_text ? (
+          <Card>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-slate-900">CV</h2>
+              {candidate.cv_file_url && (
+                <a href={candidate.cv_file_url} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline">
+                  Télécharger le PDF
+                </a>
+              )}
+            </div>
+            <pre className="text-xs text-slate-600 whitespace-pre-wrap font-mono leading-relaxed max-h-96 overflow-y-auto">
+              {candidate.cv_text}
+            </pre>
+          </Card>
+        ) : (
+          <Card>
+            <div className="text-center py-8">
+              <p className="text-slate-500">Aucun CV enregistré.</p>
+              {candidate.cv_file_url && (
+                <a href={candidate.cv_file_url} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline mt-2 block">
+                  Voir le fichier CV
+                </a>
+              )}
+            </div>
+          </Card>
+        )
+      )}
+
+      {tab === 'entretiens' && (
+        <div className="space-y-4">
+          {interviews.length === 0 ? (
+            <Card>
+              <div className="text-center py-8">
+                <CalendarPlus size={36} className="mx-auto text-slate-200 mb-3" />
+                <h3 className="font-bold text-slate-900 mb-2">Aucun entretien planifié</h3>
+                <Button size="sm" onClick={() => openSchedule(1)}>
+                  <CalendarPlus size={15} /> Planifier le 1er entretien
+                </Button>
+              </div>
+            </Card>
+          ) : (
+            interviews.map(iv => (
+              <Card key={iv.id}>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-bold text-slate-900">Entretien {iv.interview_number}</h3>
+                  <Badge variant={iv.status === 'scheduled' ? 'green' : iv.status === 'completed' ? 'blue' : 'gray'}>
+                    {iv.status === 'scheduled' ? 'Planifié' : iv.status === 'completed' ? 'Terminé' : 'En attente'}
+                  </Badge>
+                </div>
+                {iv.slots && iv.slots.length > 0 && (
+                  <div className="space-y-2 mb-3">
+                    {iv.slots.map(s => (
+                      <div key={s.id} className={`text-sm px-3 py-2 rounded-lg ${s.status === 'confirmed' ? 'bg-green-50 text-green-700 font-medium' : 'bg-slate-50 text-slate-600'}`}>
+                        {s.label || s.slot_datetime}
+                        {s.status === 'confirmed' && ' ✓'}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {iv.score !== null && (
+                  <div className="flex items-center gap-4">
+                    <ScoreDisplay score={iv.score} label="Score entretien" size="sm" />
+                    {iv.recommendation && (
+                      <span className={`font-bold text-sm ${iv.recommendation === 'GO' ? 'text-green-600' : iv.recommendation === 'MAYBE' ? 'text-orange-500' : 'text-red-500'}`}>
+                        {iv.recommendation}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {iv.ai_summary && <p className="text-sm text-slate-600 mt-3">{iv.ai_summary}</p>}
+              </Card>
+            ))
+          )}
+          {interviews.length > 0 && interviews.length < 3 && (
+            <Button size="sm" variant="secondary" onClick={() => openSchedule((interviews.length + 1) as 1 | 2 | 3)}>
+              <CalendarPlus size={15} /> Planifier entretien {interviews.length + 1}
+            </Button>
+          )}
+        </div>
+      )}
+
+      {tab === 'decision' && (
+        <div className="space-y-4">
+          <Card>
+            <h2 className="font-bold text-slate-900 mb-4">Décision finale</h2>
+            {interviews.length > 0 && (
+              <div className="mb-6">
+                <p className="text-sm text-slate-500 mb-3">Scores des entretiens</p>
+                <div className="flex gap-3">
+                  {interviews.map(iv => iv.score !== null && (
+                    <div key={iv.id} className="text-center bg-slate-50 rounded-xl p-3">
+                      <p className={`text-xl font-bold ${iv.score >= 75 ? 'text-green-600' : iv.score >= 50 ? 'text-orange-500' : 'text-red-500'}`}>{iv.score}</p>
+                      <p className="text-xs text-slate-400">E{iv.interview_number}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="grid sm:grid-cols-3 gap-3">
+              <Button onClick={() => updateStatus('hired')} disabled={statusLoading || candidate.status === 'hired'}
+                className="bg-green-600 hover:bg-green-700 text-white py-3 flex flex-col items-center gap-1 h-auto">
+                <CheckCircle size={20} />
+                <span className="font-bold">Recruter</span>
+              </Button>
+              <Button variant="secondary" onClick={() => updateStatus('pool')} disabled={statusLoading || candidate.status === 'pool'}
+                className="py-3 flex flex-col items-center gap-1 h-auto">
+                <Star size={20} className="text-orange-500" />
+                <span className="font-bold">Vivier</span>
+              </Button>
+              <Button variant="danger" onClick={() => updateStatus('rejected')} disabled={statusLoading || candidate.status === 'rejected'}
+                className="py-3 flex flex-col items-center gap-1 h-auto">
+                <XCircle size={20} />
+                <span className="font-bold">Refuser</span>
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Schedule interview modal */}
+      {showSchedule && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-slate-100">
+              <div className="flex items-center justify-between">
+                <h2 className="font-bold text-slate-900">Planifier entretien {scheduleFor}</h2>
+                <button onClick={() => setShowSchedule(false)} className="text-slate-400 hover:text-slate-600">
+                  <XCircle size={20} />
+                </button>
+              </div>
+            </div>
+            <div className="p-6 space-y-6">
+              <div>
+                <h3 className="font-semibold text-slate-900 mb-3">Créneaux proposés</h3>
+                <SlotPicker slots={slots} onChange={setSlots} />
+              </div>
+
+              {slots.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-semibold text-slate-900">Message au candidat</h3>
+                    <Button size="sm" variant="secondary" onClick={generateMsg} disabled={genMsg || !candidate.job_offer}>
+                      {genMsg ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
+                      Générer
+                    </Button>
+                  </div>
+                  {msgBody ? (
+                    <MessageEditor
+                      subject={msgSubject}
+                      message={msgBody}
+                      onSubjectChange={setMsgSubject}
+                      onMessageChange={setMsgBody}
+                      onGenerate={generateMsg}
+                      generating={genMsg}
+                    />
+                  ) : (
+                    <p className="text-sm text-slate-400">Cliquez sur "Générer" pour créer un message personnalisé</p>
+                  )}
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <Button onClick={saveSchedule} loading={scheduleSaving} disabled={slots.length === 0}>
+                  <Send size={15} /> Envoyer l'invitation
+                </Button>
+                <Button variant="secondary" onClick={() => setShowSchedule(false)}>Annuler</Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
