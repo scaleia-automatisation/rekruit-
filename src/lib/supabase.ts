@@ -1,9 +1,36 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey)
+
+// Initialize lazily so a missing env var doesn't throw at module-eval time and
+// crash the entire app. The client is created on first use; if the credentials
+// are still missing at that point we surface a clear, actionable error instead
+// of the cryptic "supabaseUrl is required" from deep inside supabase-js.
+let client: SupabaseClient<Database> | null = null
+
+function getSupabaseClient(): SupabaseClient<Database> {
+  if (client) return client
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error(
+      'Missing Supabase environment variables. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY for this environment.',
+    )
+  }
+
+  client = createClient<Database>(supabaseUrl, supabaseAnonKey)
+  return client
+}
+
+export const supabase = new Proxy({} as SupabaseClient<Database>, {
+  get(_target, prop, receiver) {
+    const instance = getSupabaseClient()
+    const value = Reflect.get(instance as object, prop, receiver)
+    return typeof value === 'function' ? value.bind(instance) : value
+  },
+})
 
 export type Database = {
   public: {

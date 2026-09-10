@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { type User, type Session } from '@supabase/supabase-js'
-import { supabase, type Database } from '../lib/supabase'
+import { supabase, isSupabaseConfigured, type Database } from '../lib/supabase'
 import { getPlan, type PlanId } from '../lib/plans'
 
 type UserProfile = Database['public']['Tables']['users']['Row']
@@ -53,6 +53,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    if (!isSupabaseConfigured) {
+      console.warn('[v0] Supabase is not configured (missing VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY). Auth is disabled.')
+      setLoading(false)
+      return
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
