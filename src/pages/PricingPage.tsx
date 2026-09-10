@@ -28,7 +28,6 @@ function FeatureValue({ val }: { val: boolean | string }) {
 }
 
 export function PricingPage() {
-  const [annual, setAnnual] = useState(false)
   const [loading, setLoading] = useState<string | null>(null)
   const [promoCode, setPromoCode] = useState('')
   const { user, session, planId } = useAuth()
@@ -47,7 +46,7 @@ export function PricingPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ plan, interval: annual ? 'annual' : 'monthly', promo_code: promoCode || undefined }),
+        body: JSON.stringify({ plan, interval: 'monthly', promo_code: promoCode || undefined }),
       })
       const data = await res.json()
       if (data.url) window.location.href = data.url
@@ -56,11 +55,6 @@ export function PricingPage() {
     } finally {
       setLoading(null)
     }
-  }
-
-  const savings = {
-    tpe_pme: Math.round((PLANS.tpe_pme.price * 12 - PLANS.tpe_pme.annualPrice) / (PLANS.tpe_pme.price * 12) * 100),
-    agence: Math.round((PLANS.agence.price * 12 - PLANS.agence.annualPrice) / (PLANS.agence.price * 12) * 100),
   }
 
   return (
@@ -107,21 +101,8 @@ export function PricingPage() {
           Commencez gratuitement. Évoluez sans friction. Annulez à tout moment.
         </p>
 
-        {/* Toggle */}
-        <div className="inline-flex items-center gap-4 bg-white/5 border border-white/10 rounded-2xl p-1.5">
-          <button
-            onClick={() => setAnnual(false)}
-            className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${!annual ? 'bg-white text-slate-900 shadow' : 'text-slate-400 hover:text-white'}`}
-          >
-            Mensuel
-          </button>
-          <button
-            onClick={() => setAnnual(true)}
-            className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 ${annual ? 'bg-white text-slate-900 shadow' : 'text-slate-400 hover:text-white'}`}
-          >
-            Annuel
-            <span className="bg-emerald-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">-17%</span>
-          </button>
+        <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 text-slate-300 text-sm font-medium px-5 py-2.5 rounded-2xl">
+          Facturation mensuelle · Sans engagement
         </div>
       </section>
 
@@ -163,15 +144,10 @@ export function PricingPage() {
             <div className="mb-6">
               <p className="text-blue-200 text-sm font-semibold uppercase tracking-widest mb-2">TPE / PME</p>
               <div className="flex items-end gap-1 mb-1">
-                <span className="text-5xl font-extrabold">
-                  {annual ? `${(PLANS.tpe_pme.annualPrice / 12).toFixed(0)}€` : `${PLANS.tpe_pme.price}€`}
-                </span>
+                <span className="text-5xl font-extrabold">{PLANS.tpe_pme.price}€</span>
                 <span className="text-blue-200 mb-2">/mois</span>
               </div>
-              {annual && (
-                <p className="text-blue-200 text-sm">Facturé {PLANS.tpe_pme.annualPrice}€/an · économisez {savings.tpe_pme}%</p>
-              )}
-              {!annual && <p className="text-blue-200 text-sm">Recrutement simplifié</p>}
+              <p className="text-blue-200 text-sm">Recrutement simplifié · sans engagement</p>
             </div>
             <ul className="flex flex-col gap-3 flex-1 mb-8">
               {['Offres illimitées', '200 candidats / mois', '5 utilisateurs', 'Scoring IA + Analyse audio', 'Entretiens vidéo IA', 'SMS automatiques', 'Analytics avancés', 'Export CSV/PDF'].map(f => (
@@ -199,15 +175,10 @@ export function PricingPage() {
             <div className="mb-6">
               <p className="text-slate-400 text-sm font-semibold uppercase tracking-widest mb-2">Agence</p>
               <div className="flex items-end gap-1 mb-1">
-                <span className="text-5xl font-extrabold">
-                  {annual ? `${(PLANS.agence.annualPrice / 12).toFixed(0)}€` : `${PLANS.agence.price}€`}
-                </span>
+                <span className="text-5xl font-extrabold">{PLANS.agence.price}€</span>
                 <span className="text-slate-400 mb-2">/mois</span>
               </div>
-              {annual && (
-                <p className="text-slate-400 text-sm">Facturé {PLANS.agence.annualPrice}€/an · économisez {savings.agence}%</p>
-              )}
-              {!annual && <p className="text-slate-400 text-sm">Recrutement à grande échelle</p>}
+              <p className="text-slate-400 text-sm">Recrutement à grande échelle · sans engagement</p>
             </div>
             <ul className="flex flex-col gap-3 flex-1 mb-8">
               {['Tout TPE/PME inclus', '1 000 candidats / mois', 'Utilisateurs illimités', 'Gestion d\'équipe avancée', 'Dashboard analytics complet', 'Support prioritaire dédié', 'SLA garanti', 'Onboarding personnalisé'].map(f => (

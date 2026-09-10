@@ -6,15 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const PRICE_IDS: Record<string, Record<string, string>> = {
-  tpe_pme: {
-    monthly: Deno.env.get('STRIPE_PRICE_TPE_MONTHLY') || '',
-    annual: Deno.env.get('STRIPE_PRICE_TPE_ANNUAL') || '',
-  },
-  agence: {
-    monthly: Deno.env.get('STRIPE_PRICE_AGENCE_MONTHLY') || '',
-    annual: Deno.env.get('STRIPE_PRICE_AGENCE_ANNUAL') || '',
-  },
+const PRICE_IDS: Record<string, string> = {
+  tpe_pme: Deno.env.get('STRIPE_PRICE_TPE_MONTHLY') || '',
+  agence: Deno.env.get('STRIPE_PRICE_AGENCE_MONTHLY') || '',
 }
 
 Deno.serve(async (req: Request) => {
@@ -29,8 +23,8 @@ Deno.serve(async (req: Request) => {
   const { data: { user } } = await supabase.auth.getUser(jwt!)
   if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders })
 
-  const { plan, interval, promo_code } = await req.json()
-  const priceId = PRICE_IDS[plan]?.[interval]
+  const { plan, promo_code } = await req.json()
+  const priceId = PRICE_IDS[plan]
   if (!priceId) return new Response(JSON.stringify({ error: 'Plan invalide' }), { status: 400, headers: corsHeaders })
 
   const { data: profile } = await supabase.from('users').select('*, organization:organizations(*)').eq('id', user.id).single()
@@ -57,7 +51,7 @@ Deno.serve(async (req: Request) => {
     cancel_url: `${origin}/pricing`,
     'metadata[organization_id]': org?.id || '',
     'metadata[plan]': plan,
-    'metadata[interval]': interval,
+    'metadata[interval]': 'monthly',
     customer_email: user.email!,
   })
 
