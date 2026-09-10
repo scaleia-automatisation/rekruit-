@@ -17,6 +17,7 @@ interface AuthContextType {
   plan: ReturnType<typeof getPlan>
   signUp: (email: string, password: string, firstName: string, lastName: string, companyName: string) => Promise<{ error: Error | null }>
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>
+  signInWithGoogle: () => Promise<{ error: Error | null }>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<{ error: Error | null }>
   refreshProfile: () => Promise<void>
@@ -93,6 +94,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error }
   }
 
+  const signInWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/dashboard` },
+    })
+    return { error }
+  }
+
   const signOut = async () => {
     await supabase.auth.signOut()
     setProfile(null)
@@ -118,7 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider value={{
       user, session, profile, organization, loading,
       isSuperAdmin, planId, plan,
-      signUp, signIn, signOut, resetPassword, refreshProfile
+      signUp, signIn, signInWithGoogle, signOut, resetPassword, refreshProfile
     }}>
       {children}
     </AuthContext.Provider>
