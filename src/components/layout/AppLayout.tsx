@@ -85,7 +85,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           <Link to="/billing" className="flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-slate-50 transition-colors group">
             <CreditCard size={14} className="text-slate-400 group-hover:text-blue-600" />
             <span className="text-xs font-semibold text-slate-500 group-hover:text-slate-700">
-              Plan {planId === 'free' ? 'Free' : planId === 'tpe_pme' ? 'TPE/PME' : 'Agence'}
+              Plan {planId === 'free' ? 'Free' : planId === 'tpe_pme' ? 'Pro' : 'Business'}
             </span>
           </Link>
 

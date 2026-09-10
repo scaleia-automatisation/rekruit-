@@ -70,8 +70,8 @@ export function SuperAdminDashboard() {
 
   const planDist = stats ? [
     { label: 'Free', count: stats.freeOrgs, color: 'bg-slate-400' },
-    { label: 'TPE/PME', count: stats.tpeOrgs, color: 'bg-blue-500' },
-    { label: 'Agence', count: stats.agenceOrgs, color: 'bg-violet-500' },
+    { label: 'Pro', count: stats.tpeOrgs, color: 'bg-blue-500' },
+    { label: 'Business', count: stats.agenceOrgs, color: 'bg-violet-500' },
   ] : []
 
   return (

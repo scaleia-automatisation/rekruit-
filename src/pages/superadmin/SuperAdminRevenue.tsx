@@ -38,7 +38,7 @@ export function SuperAdminRevenue() {
     }
   }
 
-  const planLabel: Record<string, string> = { tpe_pme: 'TPE / PME', agence: 'Agence' }
+  const planLabel: Record<string, string> = { tpe_pme: 'Pro', agence: 'Business' }
   const planColors: Record<string, string> = { tpe_pme: 'bg-blue-500', agence: 'bg-violet-500' }
 
   return (

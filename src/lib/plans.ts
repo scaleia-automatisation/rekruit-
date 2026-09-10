@@ -41,7 +41,7 @@ export const PLANS: Record<PlanId, { id: PlanId; name: string; price: number; an
   },
   tpe_pme: {
     id: 'tpe_pme',
-    name: 'TPE / PME',
+    name: 'Pro',
     price: 39.90,
     annualPrice: 399,
     description: 'Recrutez simplement et efficacement',
@@ -63,7 +63,7 @@ export const PLANS: Record<PlanId, { id: PlanId; name: string; price: number; an
   },
   agence: {
     id: 'agence',
-    name: 'Agence',
+    name: 'Business',
     price: 79.90,
     annualPrice: 799,
     description: 'Le recrutement à grande échelle',

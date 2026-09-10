@@ -142,7 +142,7 @@ export function PricingPage() {
               <span className="bg-white text-blue-700 text-xs font-bold px-4 py-1.5 rounded-full shadow">⭐ Recommandé</span>
             </div>
             <div className="mb-6">
-              <p className="text-blue-200 text-sm font-semibold uppercase tracking-widest mb-2">TPE / PME</p>
+              <p className="text-blue-200 text-sm font-semibold uppercase tracking-widest mb-2">Pro</p>
               <div className="flex items-end gap-1 mb-1">
                 <span className="text-5xl font-extrabold">{PLANS.tpe_pme.price}€</span>
                 <span className="text-blue-200 mb-2">/mois</span>
@@ -173,7 +173,7 @@ export function PricingPage() {
           {/* Agence */}
           <div className="bg-white/5 border border-white/10 rounded-2xl p-8 flex flex-col">
             <div className="mb-6">
-              <p className="text-slate-400 text-sm font-semibold uppercase tracking-widest mb-2">Agence</p>
+              <p className="text-slate-400 text-sm font-semibold uppercase tracking-widest mb-2">Business</p>
               <div className="flex items-end gap-1 mb-1">
                 <span className="text-5xl font-extrabold">{PLANS.agence.price}€</span>
                 <span className="text-slate-400 mb-2">/mois</span>
@@ -225,7 +225,7 @@ export function PricingPage() {
               <tr className="border-b border-white/10 bg-white/5">
                 <th className="text-left px-6 py-4 text-sm font-semibold text-slate-400">Fonctionnalité</th>
                 <th className="text-center px-4 py-4 text-sm font-semibold text-slate-400">Free</th>
-                <th className="text-center px-4 py-4 text-sm font-bold text-blue-400 bg-blue-500/10">TPE/PME</th>
+                <th className="text-center px-4 py-4 text-sm font-bold text-blue-400 bg-blue-500/10">Pro</th>
                 <th className="text-center px-4 py-4 text-sm font-semibold text-slate-400">Agence</th>
               </tr>
             </thead>

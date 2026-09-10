@@ -35,7 +35,7 @@ export function SuperAdminCompanies() {
 
   const filtered = companies.filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || (c.email ?? '').toLowerCase().includes(search.toLowerCase()))
 
-  const planLabel: Record<string, string> = { free: 'Free', tpe_pme: 'TPE/PME', agence: 'Agence' }
+  const planLabel: Record<string, string> = { free: 'Free', tpe_pme: 'Pro', agence: 'Business' }
   const statusLabel: Record<string, string> = { active: 'Actif', canceled: 'Annulé', past_due: 'En retard', trialing: 'Essai' }
 
   return (

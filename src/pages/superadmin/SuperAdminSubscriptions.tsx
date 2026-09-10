@@ -31,7 +31,7 @@ export function SuperAdminSubscriptions() {
       })
   }, [])
 
-  const planLabel: Record<string, string> = { free: 'Free', tpe_pme: 'TPE/PME', agence: 'Agence' }
+  const planLabel: Record<string, string> = { free: 'Free', tpe_pme: 'Pro', agence: 'Business' }
   const statusColors: Record<string, string> = {
     active: 'text-emerald-400', canceled: 'text-slate-500', past_due: 'text-red-400', trialing: 'text-blue-400',
   }
