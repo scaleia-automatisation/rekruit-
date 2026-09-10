@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { type User, type Session } from '@supabase/supabase-js'
 import { supabase, type Database } from '../lib/supabase'
+import { getPlan, type PlanId } from '../lib/plans'
 
 type UserProfile = Database['public']['Tables']['users']['Row']
 type Organization = Database['public']['Tables']['organizations']['Row']
@@ -11,6 +12,9 @@ interface AuthContextType {
   profile: UserProfile | null
   organization: Organization | null
   loading: boolean
+  isSuperAdmin: boolean
+  planId: PlanId
+  plan: ReturnType<typeof getPlan>
   signUp: (email: string, password: string, firstName: string, lastName: string, companyName: string) => Promise<{ error: Error | null }>
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>
   signOut: () => Promise<void>
@@ -106,9 +110,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user) await fetchProfile(user.id)
   }
 
+  const isSuperAdmin = profile?.is_super_admin === true
+  const planId = (organization?.plan || 'free') as PlanId
+  const plan = getPlan(planId)
+
   return (
     <AuthContext.Provider value={{
       user, session, profile, organization, loading,
+      isSuperAdmin, planId, plan,
       signUp, signIn, signOut, resetPassword, refreshProfile
     }}>
       {children}

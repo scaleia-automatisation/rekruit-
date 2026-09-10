@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /offres/
+Disallow: /candidats/
+Disallow: /admin/
+Disallow: /super-admin/
+Disallow: /billing
+Disallow: /analytics
+Disallow: /onboarding
+Disallow: /c/
+
+Sitemap: https://rekruit.net/sitemap.xml

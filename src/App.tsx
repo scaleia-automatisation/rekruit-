@@ -19,6 +19,17 @@ import { InterviewsPage } from './pages/InterviewsPage'
 import { CalendarPage } from './pages/CalendarPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { PublicInterviewPage } from './pages/PublicInterviewPage'
+import { PricingPage } from './pages/PricingPage'
+import { BillingPage } from './pages/BillingPage'
+import { AdminPage } from './pages/AdminPage'
+import { AdminUsersPage } from './pages/admin/AdminUsersPage'
+import { AnalyticsPage } from './pages/AnalyticsPage'
+import { SuperAdminLayout } from './pages/superadmin/SuperAdminLayout'
+import { SuperAdminDashboard } from './pages/superadmin/SuperAdminDashboard'
+import { SuperAdminCompanies } from './pages/superadmin/SuperAdminCompanies'
+import { SuperAdminSubscriptions } from './pages/superadmin/SuperAdminSubscriptions'
+import { SuperAdminRevenue } from './pages/superadmin/SuperAdminRevenue'
+import { SuperAdminUsage } from './pages/superadmin/SuperAdminUsage'
 
 function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const { profile, loading } = useAuth()
@@ -153,6 +164,88 @@ function AppRoutes() {
               <SettingsPage />
             </AppLayout>
           </OnboardingGuard>
+        </ProtectedRoute>
+      } />
+
+      {/* Pricing (public) */}
+      <Route path="/pricing" element={<PricingPage />} />
+
+      {/* Billing */}
+      <Route path="/billing" element={
+        <ProtectedRoute>
+          <OnboardingGuard>
+            <AppLayout>
+              <BillingPage />
+            </AppLayout>
+          </OnboardingGuard>
+        </ProtectedRoute>
+      } />
+
+      {/* Analytics */}
+      <Route path="/analytics" element={
+        <ProtectedRoute>
+          <OnboardingGuard>
+            <AppLayout>
+              <AnalyticsPage />
+            </AppLayout>
+          </OnboardingGuard>
+        </ProtectedRoute>
+      } />
+
+      {/* Admin */}
+      <Route path="/admin" element={
+        <ProtectedRoute>
+          <OnboardingGuard>
+            <AppLayout>
+              <AdminPage />
+            </AppLayout>
+          </OnboardingGuard>
+        </ProtectedRoute>
+      } />
+      <Route path="/admin/utilisateurs" element={
+        <ProtectedRoute>
+          <OnboardingGuard>
+            <AppLayout>
+              <AdminUsersPage />
+            </AppLayout>
+          </OnboardingGuard>
+        </ProtectedRoute>
+      } />
+
+      {/* Super Admin */}
+      <Route path="/super-admin" element={
+        <ProtectedRoute>
+          <SuperAdminLayout>
+            <SuperAdminDashboard />
+          </SuperAdminLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/super-admin/entreprises" element={
+        <ProtectedRoute>
+          <SuperAdminLayout>
+            <SuperAdminCompanies />
+          </SuperAdminLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/super-admin/abonnements" element={
+        <ProtectedRoute>
+          <SuperAdminLayout>
+            <SuperAdminSubscriptions />
+          </SuperAdminLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/super-admin/revenus" element={
+        <ProtectedRoute>
+          <SuperAdminLayout>
+            <SuperAdminRevenue />
+          </SuperAdminLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/super-admin/usage" element={
+        <ProtectedRoute>
+          <SuperAdminLayout>
+            <SuperAdminUsage />
+          </SuperAdminLayout>
         </ProtectedRoute>
       } />
 

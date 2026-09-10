@@ -163,8 +163,7 @@ export function SettingsPage() {
             <div>
               <p className="text-sm text-slate-600">Votre rôle</p>
               <p className="font-semibold text-slate-900 capitalize mt-0.5">
-                {profile?.role === 'admin' ? 'Administrateur' :
-                 profile?.role === 'super_admin' ? 'Super Admin' : 'Recruteur'}
+                {profile?.role === 'admin' ? 'Administrateur' : 'Recruteur'}
               </p>
             </div>
             <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">

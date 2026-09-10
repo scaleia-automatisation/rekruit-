@@ -13,11 +13,18 @@ export type Database = {
           id: string
           name: string
           logo: string | null
+          logo_url: string | null
           email: string | null
           phone: string | null
           address: string | null
           website: string | null
           plan: string
+          plan_interval: string | null
+          plan_status: string | null
+          plan_current_period_end: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          credits: number
           status: string
           created_at: string
           updated_at: string
@@ -33,7 +40,8 @@ export type Database = {
           last_name: string
           email: string
           phone: string | null
-          role: 'super_admin' | 'admin' | 'recruiter'
+          role: 'admin' | 'recruiter'
+          is_super_admin: boolean
           plan: string
           status: string
           onboarding_completed: boolean
