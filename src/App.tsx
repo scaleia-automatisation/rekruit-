@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { AppLayout } from './components/layout/AppLayout'
 import { ProtectedRoute } from './components/layout/ProtectedRoute'
+import { PublicRoute } from './components/layout/PublicRoute'
 
 import { LandingPage } from './pages/LandingPage'
 import { LoginPage } from './pages/auth/LoginPage'
@@ -44,9 +45,9 @@ function AppRoutes() {
   return (
     <Routes>
       {/* Public */}
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/connexion" element={<LoginPage />} />
-      <Route path="/inscription" element={<RegisterPage />} />
+      <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
+      <Route path="/connexion" element={<PublicRoute><LoginPage /></PublicRoute>} />
+      <Route path="/inscription" element={<PublicRoute><RegisterPage /></PublicRoute>} />
       <Route path="/mot-de-passe-oublie" element={<ForgotPasswordPage />} />
 
       {/* Onboarding */}
