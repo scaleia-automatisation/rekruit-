@@ -3,11 +3,13 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { AppLayout } from './components/layout/AppLayout'
 import { ProtectedRoute } from './components/layout/ProtectedRoute'
 import { PublicRoute } from './components/layout/PublicRoute'
+import { CookieBanner } from './components/CookieBanner'
 
 import { LandingPage } from './pages/LandingPage'
 import { LoginPage } from './pages/auth/LoginPage'
 import { RegisterPage } from './pages/auth/RegisterPage'
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage'
+import { ResetPasswordPage } from './pages/auth/ResetPasswordPage'
 import { OnboardingPage } from './pages/OnboardingPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { OffersPage } from './pages/OffersPage'
@@ -32,6 +34,34 @@ import { SuperAdminSubscriptions } from './pages/superadmin/SuperAdminSubscripti
 import { SuperAdminRevenue } from './pages/superadmin/SuperAdminRevenue'
 import { SuperAdminUsage } from './pages/superadmin/SuperAdminUsage'
 
+// Public pages
+import { FeaturesPage } from './pages/FeaturesPage'
+import { HowItWorksPage } from './pages/HowItWorksPage'
+import { FaqPage } from './pages/FaqPage'
+import { AboutPage } from './pages/AboutPage'
+import { ContactPage } from './pages/ContactPage'
+import { HelpPage } from './pages/HelpPage'
+
+// Legal pages
+import { PrivacyPage } from './pages/legal/PrivacyPage'
+import { TermsPage } from './pages/legal/TermsPage'
+import { CgvPage } from './pages/legal/CgvPage'
+import { LegalNoticePage } from './pages/legal/LegalNoticePage'
+import { CookiesPage } from './pages/legal/CookiesPage'
+import { CookieSettingsPage } from './pages/legal/CookieSettingsPage'
+import { RefundPolicyPage } from './pages/legal/RefundPolicyPage'
+import { PrivacyContactPage } from './pages/legal/PrivacyContactPage'
+import { DataDeletionPage } from './pages/legal/DataDeletionPage'
+
+// Settings sub-pages
+import { ProfileSettingsPage } from './pages/settings/ProfileSettingsPage'
+import { CompanySettingsPage } from './pages/settings/CompanySettingsPage'
+import { NotificationsSettingsPage } from './pages/settings/NotificationsSettingsPage'
+import { SecuritySettingsPage } from './pages/settings/SecuritySettingsPage'
+import { SubscriptionSettingsPage } from './pages/settings/SubscriptionSettingsPage'
+import { TeamSettingsPage } from './pages/settings/TeamSettingsPage'
+import { DataSettingsPage } from './pages/settings/DataSettingsPage'
+
 function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const { profile, loading } = useAuth()
   if (loading) return null
@@ -49,6 +79,26 @@ function AppRoutes() {
       <Route path="/connexion" element={<PublicRoute><LoginPage /></PublicRoute>} />
       <Route path="/inscription" element={<PublicRoute><RegisterPage /></PublicRoute>} />
       <Route path="/mot-de-passe-oublie" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+
+      {/* Public info pages */}
+      <Route path="/features" element={<FeaturesPage />} />
+      <Route path="/how-it-works" element={<HowItWorksPage />} />
+      <Route path="/faq" element={<FaqPage />} />
+      <Route path="/about" element={<AboutPage />} />
+      <Route path="/contact" element={<ContactPage />} />
+      <Route path="/help" element={<HelpPage />} />
+
+      {/* Legal pages */}
+      <Route path="/privacy" element={<PrivacyPage />} />
+      <Route path="/terms" element={<TermsPage />} />
+      <Route path="/cgv" element={<CgvPage />} />
+      <Route path="/legal-notice" element={<LegalNoticePage />} />
+      <Route path="/cookies" element={<CookiesPage />} />
+      <Route path="/cookie-settings" element={<CookieSettingsPage />} />
+      <Route path="/refund-policy" element={<RefundPolicyPage />} />
+      <Route path="/privacy-contact" element={<PrivacyContactPage />} />
+      <Route path="/data-deletion" element={<DataDeletionPage />} />
 
       {/* Onboarding */}
       <Route path="/onboarding" element={
@@ -168,6 +218,71 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
 
+      {/* Settings sub-pages */}
+      <Route path="/settings/profile" element={
+        <ProtectedRoute>
+          <OnboardingGuard>
+            <AppLayout>
+              <ProfileSettingsPage />
+            </AppLayout>
+          </OnboardingGuard>
+        </ProtectedRoute>
+      } />
+      <Route path="/settings/company" element={
+        <ProtectedRoute>
+          <OnboardingGuard>
+            <AppLayout>
+              <CompanySettingsPage />
+            </AppLayout>
+          </OnboardingGuard>
+        </ProtectedRoute>
+      } />
+      <Route path="/settings/notifications" element={
+        <ProtectedRoute>
+          <OnboardingGuard>
+            <AppLayout>
+              <NotificationsSettingsPage />
+            </AppLayout>
+          </OnboardingGuard>
+        </ProtectedRoute>
+      } />
+      <Route path="/settings/security" element={
+        <ProtectedRoute>
+          <OnboardingGuard>
+            <AppLayout>
+              <SecuritySettingsPage />
+            </AppLayout>
+          </OnboardingGuard>
+        </ProtectedRoute>
+      } />
+      <Route path="/settings/subscription" element={
+        <ProtectedRoute>
+          <OnboardingGuard>
+            <AppLayout>
+              <SubscriptionSettingsPage />
+            </AppLayout>
+          </OnboardingGuard>
+        </ProtectedRoute>
+      } />
+      <Route path="/settings/team" element={
+        <ProtectedRoute>
+          <OnboardingGuard>
+            <AppLayout>
+              <TeamSettingsPage />
+            </AppLayout>
+          </OnboardingGuard>
+        </ProtectedRoute>
+      } />
+      <Route path="/settings/data" element={
+        <ProtectedRoute>
+          <OnboardingGuard>
+            <AppLayout>
+              <DataSettingsPage />
+            </AppLayout>
+          </OnboardingGuard>
+        </ProtectedRoute>
+      } />
+
       {/* Pricing (public) */}
       <Route path="/pricing" element={<PricingPage />} />
 
@@ -264,6 +379,7 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <AppRoutes />
+        <CookieBanner />
       </AuthProvider>
     </BrowserRouter>
   )
