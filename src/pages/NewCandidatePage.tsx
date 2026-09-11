@@ -63,20 +63,20 @@ export function NewCandidatePage() {
       reader.readAsDataURL(file)
     })
 
-  const runAnalysis = async () => {
-    if (!cvFile) return
+  const runAnalysis = async (file: File, cover?: File | null) => {
     setAnalyzing(true)
+    setAnalyzed(false)
     setError('')
     try {
       const params: Record<string, unknown> = { job_offer: jobOffer || undefined }
-      if (cvFile.type === 'application/pdf') {
-        params.cv_base64 = await fileToBase64(cvFile)
+      if (file.type === 'application/pdf') {
+        params.cv_base64 = await fileToBase64(file)
         params.cv_media_type = 'application/pdf'
       } else {
-        params.cv_text = await cvFile.text()
+        params.cv_text = await file.text()
       }
-      if (coverFile) {
-        params.cover_letter_text = await coverFile.text()
+      if (cover) {
+        params.cover_letter_text = await cover.text()
       }
 
       const data = await analyzeCandidate(params as Parameters<typeof analyzeCandidate>[0])
@@ -94,6 +94,11 @@ export function NewCandidatePage() {
     } finally {
       setAnalyzing(false)
     }
+  }
+
+  const selectCv = (file: File) => {
+    setCvFile(file)
+    runAnalysis(file, coverFile)
   }
 
   const handleSave = async () => {
@@ -148,7 +153,7 @@ export function NewCandidatePage() {
     e.preventDefault()
     setDragOver(false)
     const file = e.dataTransfer.files[0]
-    if (file) setCvFile(file)
+    if (file) selectCv(file)
   }
 
   return (
@@ -185,7 +190,7 @@ export function NewCandidatePage() {
             dragOver ? 'border-blue-400 bg-blue-50' : cvFile ? 'border-green-300 bg-green-50' : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
           }`}
         >
-          <input ref={fileRef} type="file" accept=".pdf,.txt,.doc,.docx" onChange={e => setCvFile(e.target.files?.[0] || null)} className="hidden" />
+          <input ref={fileRef} type="file" accept=".pdf,.txt,.doc,.docx" onChange={e => { const f = e.target.files?.[0]; if (f) selectCv(f) }} className="hidden" />
           {cvFile ? (
             <div className="flex items-center justify-center gap-3">
               <FileText size={24} className="text-green-600" />
@@ -212,11 +217,11 @@ export function NewCandidatePage() {
           </div>
         )}
 
-        {cvFile && (
+        {cvFile && !analyzing && (
           <div className="mt-4 flex items-center gap-3">
-            <Button onClick={runAnalysis} disabled={analyzing}>
-              {analyzing ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />}
-              {analyzing ? 'Analyse IA en cours...' : 'Analyser avec l\'IA'}
+            <Button onClick={() => runAnalysis(cvFile, coverFile)} disabled={analyzing}>
+              <Wand2 size={16} />
+              Ré-analyser avec l'IA
             </Button>
             {analyzed && <span className="text-sm text-green-600 font-medium">✓ Informations extraites</span>}
           </div>
