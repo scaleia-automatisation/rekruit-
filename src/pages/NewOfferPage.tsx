@@ -64,7 +64,7 @@ export function NewOfferPage() {
       const data = await analyzeOffer(params)
       setForm(f => {
         const next = { ...f, ...Object.fromEntries(Object.entries(data).filter(([, v]) => v !== null && v !== undefined && v !== '')) } as OfferForm
-        next.full_offer = buildMarkdown(next)
+        if (!next.full_offer) next.full_offer = buildMarkdown(next)
         return next
       })
       setAnalyzed(true)

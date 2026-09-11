@@ -51,29 +51,32 @@ Deno.serve(async (req: Request) => {
       },
       body: JSON.stringify({
         model,
-        max_tokens: 2000,
+        max_tokens: 4000,
         messages: [{
           role: 'user',
-          content: `Analyse cette offre d'emploi et extrais les informations en JSON.
+          content: `Tu es un expert RH. Analyse cette offre d'emploi en intégralité et extrait TOUTES les informations sans rien omettre.
 
-Offre:
+OFFRE À ANALYSER:
 ${jobText}
 
-Réponds UNIQUEMENT avec un JSON valide ayant ces champs:
+Réponds UNIQUEMENT avec un JSON valide (sans markdown, sans backticks) ayant exactement ces champs.
+Pour chaque champ texte, sois exhaustif et fidèle au contenu original — ne résume pas, retranscris tout le contenu pertinent.
+
 {
-  "title": "titre du poste",
-  "company": "nom de l'entreprise",
-  "location": "lieu (ville, pays)",
+  "title": "titre exact du poste",
+  "company": "nom exact de l'entreprise",
+  "location": "lieu complet (ville, département, pays, remote/hybride si mentionné)",
   "contract_type": "CDI|CDD|Stage|Freelance|Alternance",
-  "salary_range": "fourchette salariale si mentionnée",
-  "description": "description générale du poste (2-3 phrases)",
-  "missions": "liste des missions principales",
-  "skills": "compétences techniques requises",
-  "experience": "années d'expérience requises",
-  "education": "niveau d'études requis",
-  "languages": "langues requises",
-  "mandatory_criteria": "critères absolument requis",
-  "preferred_criteria": "critères appréciés mais non obligatoires"
+  "salary_range": "fourchette salariale exacte avec avantages si mentionnés (sinon chaîne vide)",
+  "description": "description complète du poste et du contexte de l'entreprise, sans rien couper",
+  "missions": "liste complète de TOUTES les missions et responsabilités, une par ligne avec tiret",
+  "skills": "liste complète de TOUTES les compétences techniques et outils mentionnés, une par ligne avec tiret",
+  "experience": "niveau et années d'expérience requis, avec le contexte exact mentionné",
+  "education": "niveau d'études et formations requis, exacts",
+  "languages": "toutes les langues requises ou souhaitées avec le niveau si précisé",
+  "mandatory_criteria": "liste de tous les critères absolument requis (must-have), un par ligne avec tiret",
+  "preferred_criteria": "liste de tous les critères appréciés mais non obligatoires (nice-to-have), un par ligne avec tiret",
+  "full_offer": "reproduction complète et fidèle de l'offre en Markdown bien structuré avec # pour le titre, ## pour chaque section, et - pour les listes. Inclure TOUTES les sections sans exception."
 }`
         }]
       })
