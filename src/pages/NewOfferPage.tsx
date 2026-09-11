@@ -172,13 +172,22 @@ export function NewOfferPage() {
         </div>
 
         {tab === 'text' ? (
-          <textarea
-            placeholder="Collez ici le texte complet de l'offre d'emploi..."
-            value={inputText}
-            onChange={e => setInputText(e.target.value)}
-            rows={6}
-            className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 resize-none"
-          />
+          <div className="space-y-1.5">
+            <textarea
+              placeholder="Collez ici le texte complet de l'offre d'emploi (jusqu'à 2 500 mots)..."
+              value={inputText}
+              onChange={e => setInputText(e.target.value)}
+              rows={14}
+              maxLength={20000}
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 resize-y overflow-y-scroll"
+            />
+            <div className="flex justify-between text-xs text-slate-400">
+              <span>Conseil : sélectionnez tout le texte de la page de l'offre (Ctrl+A) puis collez ici</span>
+              <span className={inputText.trim().split(/\s+/).filter(Boolean).length > 2500 ? 'text-red-500 font-medium' : ''}>
+                {inputText.trim() ? inputText.trim().split(/\s+/).filter(Boolean).length : 0} / 2 500 mots
+              </span>
+            </div>
+          </div>
         ) : (
           <div className="space-y-2">
             <Input
