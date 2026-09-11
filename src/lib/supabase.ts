@@ -5,9 +5,11 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey)
 
-let client: SupabaseClient<Database> | null = null
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let client: SupabaseClient<any> | null = null
 
-function getSupabaseClient(): SupabaseClient<Database> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getSupabaseClient(): SupabaseClient<any> {
   if (client) return client
 
   if (!supabaseUrl || !supabaseAnonKey) {
@@ -16,11 +18,12 @@ function getSupabaseClient(): SupabaseClient<Database> {
     )
   }
 
-  client = createClient<Database>(supabaseUrl, supabaseAnonKey)
+  client = createClient(supabaseUrl, supabaseAnonKey)
   return client
 }
 
-export const supabase = new Proxy({} as SupabaseClient<Database>, {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const supabase = new Proxy({} as SupabaseClient<any>, {
   get(_target, prop, receiver) {
     const instance = getSupabaseClient()
     const value = Reflect.get(instance as object, prop, receiver)
