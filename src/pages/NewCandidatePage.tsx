@@ -188,101 +188,115 @@ export function NewCandidatePage() {
         </select>
       </div>
 
-      {/* CV Upload */}
+      {/* CV + Cover letter */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-6">
-        <h2 className="font-bold text-slate-900 mb-4">CV du candidat</h2>
-        <div
-          onDragOver={e => { e.preventDefault(); setDragOver(true) }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={handleDrop}
-          onClick={() => fileRef.current?.click()}
-          className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all ${
-            dragOver ? 'border-blue-400 bg-blue-50' : cvFile ? 'border-green-300 bg-green-50' : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
-          }`}
-        >
-          <input ref={fileRef} type="file" accept=".pdf,.txt,.doc,.docx" onChange={e => { const f = e.target.files?.[0]; if (f) selectCv(f) }} className="hidden" />
-          {cvFile ? (
-            <div className="flex items-center justify-center gap-3">
-              <FileText size={24} className="text-green-600" />
-              <span className="font-medium text-green-700">{cvFile.name}</span>
-              <button onClick={e => { e.stopPropagation(); setCvFile(null); setAnalyzed(false) }} className="text-slate-400 hover:text-red-500">
-                <X size={16} />
-              </button>
+        <h2 className="font-bold text-slate-900 mb-4">Documents du candidat</h2>
+        <div className="grid sm:grid-cols-2 gap-6">
+          {/* Left: CV */}
+          <div className="flex flex-col">
+            <p className="text-sm font-medium text-slate-700 mb-2">CV</p>
+            <div
+              onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleDrop}
+              onClick={() => fileRef.current?.click()}
+              className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all flex-1 flex flex-col items-center justify-center ${
+                dragOver ? 'border-blue-400 bg-blue-50' : cvFile ? 'border-green-300 bg-green-50' : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+              }`}
+            >
+              <input ref={fileRef} type="file" accept=".pdf,.txt,.doc,.docx" onChange={e => { const f = e.target.files?.[0]; if (f) selectCv(f) }} className="hidden" />
+              {cvFile ? (
+                <div className="flex items-center justify-center gap-2 flex-wrap">
+                  <FileText size={20} className="text-green-600 shrink-0" />
+                  <span className="font-medium text-green-700 text-sm truncate max-w-[140px]">{cvFile.name}</span>
+                  <button onClick={e => { e.stopPropagation(); setCvFile(null); setAnalyzed(false) }} className="text-slate-400 hover:text-red-500">
+                    <X size={15} />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <Upload size={28} className="text-slate-300 mb-2" />
+                  <p className="font-medium text-slate-600 text-sm">Glissez ou cliquez</p>
+                  <p className="text-xs text-slate-400 mt-1">PDF, TXT, DOC</p>
+                </>
+              )}
             </div>
-          ) : (
-            <>
-              <Upload size={32} className="mx-auto text-slate-300 mb-3" />
-              <p className="font-medium text-slate-700">Glissez le CV ou cliquez pour sélectionner</p>
-              <p className="text-xs text-slate-400 mt-1">PDF, TXT, DOC — max 10 Mo</p>
-            </>
-          )}
-        </div>
 
-        {/* Optional cover letter */}
-        {cvFile && (
-          <div className="mt-4">
-            <p className="block text-sm font-medium text-slate-700 mb-2">Lettre de motivation (optionnel)</p>
-            <div className="flex gap-2 mb-3">
-              {(['file', 'text'] as const).map(t => (
-                <button key={t} onClick={() => setCoverTab(t)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${coverTab === t ? 'bg-blue-600 text-white border-blue-600' : 'border-slate-200 text-slate-600 hover:border-blue-300'}`}>
-                  {t === 'file' ? 'Importer un fichier' : 'Saisir / coller en Markdown'}
-                </button>
-              ))}
+            {cvFile && !analyzing && (
+              <div className="mt-3 flex items-center gap-2">
+                <Button size="sm" onClick={() => runAnalysis(cvFile, coverFile)} disabled={analyzing}>
+                  <Wand2 size={14} /> Ré-analyser
+                </Button>
+                {analyzed && <span className="text-xs text-green-600 font-medium">✓ Extrait</span>}
+              </div>
+            )}
+            {analyzing && (
+              <div className="mt-3 flex items-center gap-2 text-blue-600">
+                <Loader2 size={15} className="animate-spin" />
+                <span className="text-xs font-medium">Analyse IA en cours…</span>
+              </div>
+            )}
+            {analyzed && aiData && (
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {[
+                  { label: 'Global', value: aiData.score_global as number },
+                  { label: 'Compétences', value: aiData.score_skills as number },
+                  { label: 'Expérience', value: aiData.score_experience as number },
+                ].map(s => s.value !== null && s.value !== undefined && (
+                  <div key={s.label} className="bg-slate-50 rounded-xl p-2 text-center">
+                    <p className={`text-xl font-bold ${(s.value as number) >= 75 ? 'text-green-600' : (s.value as number) >= 50 ? 'text-orange-500' : 'text-red-500'}`}>
+                      {s.value as number}
+                    </p>
+                    <p className="text-xs text-slate-500">{s.label}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Right: Cover letter */}
+          <div className="flex flex-col">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium text-slate-700">Lettre de motivation <span className="text-slate-400 font-normal">(optionnel)</span></p>
+              <div className="flex gap-1">
+                {(['file', 'text'] as const).map(t => (
+                  <button key={t} onClick={() => setCoverTab(t)}
+                    className={`px-2 py-1 rounded-lg text-xs font-medium border transition-all ${coverTab === t ? 'bg-blue-600 text-white border-blue-600' : 'border-slate-200 text-slate-500 hover:border-blue-300'}`}>
+                    {t === 'file' ? 'Fichier' : 'Markdown'}
+                  </button>
+                ))}
+              </div>
             </div>
             {coverTab === 'file' ? (
-              <input type="file" accept=".pdf,.txt" onChange={e => setCoverFile(e.target.files?.[0] || null)}
-                className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+              <div className={`border-2 border-dashed rounded-2xl p-6 text-center flex-1 flex flex-col items-center justify-center transition-all ${coverFile ? 'border-green-300 bg-green-50' : 'border-slate-200'}`}>
+                {coverFile ? (
+                  <div className="flex items-center gap-2 flex-wrap justify-center">
+                    <FileText size={20} className="text-green-600 shrink-0" />
+                    <span className="font-medium text-green-700 text-sm truncate max-w-[140px]">{coverFile.name}</span>
+                    <button onClick={() => setCoverFile(null)} className="text-slate-400 hover:text-red-500"><X size={15} /></button>
+                  </div>
+                ) : (
+                  <>
+                    <Upload size={28} className="text-slate-300 mb-2" />
+                    <label className="cursor-pointer text-sm font-medium text-slate-600 hover:text-blue-600">
+                      Sélectionner un fichier
+                      <input type="file" accept=".pdf,.txt" className="hidden" onChange={e => setCoverFile(e.target.files?.[0] || null)} />
+                    </label>
+                    <p className="text-xs text-slate-400 mt-1">PDF, TXT</p>
+                  </>
+                )}
+              </div>
             ) : (
               <textarea
                 value={coverText}
                 onChange={e => setCoverText(e.target.value)}
                 placeholder={'# Lettre de motivation\n\nMadame, Monsieur,\n\n...'}
-                rows={10}
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-600 resize-y"
+                className="flex-1 min-h-[180px] w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-600 resize-none"
               />
             )}
+            <p className="text-xs text-slate-400 mt-2">Markdown supporté — # titres, **gras**, - listes</p>
           </div>
-        )}
-
-        {cvFile && !analyzing && (
-          <div className="mt-4 flex items-center gap-3">
-            <Button onClick={() => runAnalysis(cvFile, coverFile)} disabled={analyzing}>
-              <Wand2 size={16} />
-              Ré-analyser avec l'IA
-            </Button>
-            {analyzed && <span className="text-sm text-green-600 font-medium">✓ Informations extraites</span>}
-          </div>
-        )}
-
-        {analyzing && (
-          <div className="mt-4 bg-blue-50 rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <Loader2 size={18} className="animate-spin text-blue-600" />
-              <div>
-                <p className="text-sm font-medium text-blue-900">Analyse en cours...</p>
-                <p className="text-xs text-blue-600 mt-0.5">Extraction des informations et calcul des scores</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {analyzed && aiData && (
-          <div className="mt-4 grid grid-cols-3 gap-3">
-            {[
-              { label: 'Score global', value: aiData.score_global as number },
-              { label: 'Compétences', value: aiData.score_skills as number },
-              { label: 'Expérience', value: aiData.score_experience as number },
-            ].map(s => s.value !== null && s.value !== undefined && (
-              <div key={s.label} className="bg-slate-50 rounded-xl p-3 text-center">
-                <p className={`text-2xl font-bold ${(s.value as number) >= 75 ? 'text-green-600' : (s.value as number) >= 50 ? 'text-orange-500' : 'text-red-500'}`}>
-                  {s.value as number}
-                </p>
-                <p className="text-xs text-slate-500">{s.label}</p>
-              </div>
-            ))}
-          </div>
-        )}
+        </div>
       </div>
 
       {error && (
