@@ -15,6 +15,8 @@ export function NewCandidatePage() {
 
   const [cvFile, setCvFile] = useState<File | null>(null)
   const [coverFile, setCoverFile] = useState<File | null>(null)
+  const [coverText, setCoverText] = useState('')
+  const [coverTab, setCoverTab] = useState<'file' | 'text'>('file')
   const [analyzing, setAnalyzing] = useState(false)
   const [analyzed, setAnalyzed] = useState(false)
   const [dragOver, setDragOver] = useState(false)
@@ -77,6 +79,8 @@ export function NewCandidatePage() {
       }
       if (cover) {
         params.cover_letter_text = await cover.text()
+      } else if (coverText.trim()) {
+        params.cover_letter_text = coverText.trim()
       }
 
       const data = await analyzeCandidate(params as Parameters<typeof analyzeCandidate>[0])
@@ -117,12 +121,18 @@ export function NewCandidatePage() {
       }
     }
 
+    let coverLetterText = coverText.trim() || null
+    if (!coverLetterText && coverFile) {
+      coverLetterText = await coverFile.text()
+    }
+
     const payload: Record<string, unknown> = {
       ...form,
       organization_id: profile.organization_id,
       job_offer_id: selectedJobId || null,
       status: 'new',
       cv_file_url: cvUrl,
+      cover_letter: coverLetterText,
     }
 
     if (aiData) {
@@ -211,9 +221,27 @@ export function NewCandidatePage() {
         {/* Optional cover letter */}
         {cvFile && (
           <div className="mt-4">
-            <label className="block text-sm font-medium text-slate-700 mb-2">Lettre de motivation (optionnel)</label>
-            <input type="file" accept=".pdf,.txt" onChange={e => setCoverFile(e.target.files?.[0] || null)}
-              className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+            <p className="block text-sm font-medium text-slate-700 mb-2">Lettre de motivation (optionnel)</p>
+            <div className="flex gap-2 mb-3">
+              {(['file', 'text'] as const).map(t => (
+                <button key={t} onClick={() => setCoverTab(t)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${coverTab === t ? 'bg-blue-600 text-white border-blue-600' : 'border-slate-200 text-slate-600 hover:border-blue-300'}`}>
+                  {t === 'file' ? 'Importer un fichier' : 'Saisir / coller en Markdown'}
+                </button>
+              ))}
+            </div>
+            {coverTab === 'file' ? (
+              <input type="file" accept=".pdf,.txt" onChange={e => setCoverFile(e.target.files?.[0] || null)}
+                className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+            ) : (
+              <textarea
+                value={coverText}
+                onChange={e => setCoverText(e.target.value)}
+                placeholder={'# Lettre de motivation\n\nMadame, Monsieur,\n\n...'}
+                rows={10}
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-600 resize-y"
+              />
+            )}
           </div>
         )}
 

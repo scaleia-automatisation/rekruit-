@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 import {
   ArrowLeft, Mail, Phone, MapPin, Star, CheckCircle, XCircle, CalendarPlus, Trash2,
-  Wand2, Loader2, Send
+  Wand2, Loader2, Send, Upload, Save
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { generateMessage } from '../lib/ai'
@@ -38,6 +39,7 @@ interface Candidate {
   missing_skills: string | null
   cv_text: string | null
   cv_file_url: string | null
+  cover_letter: string | null
   job_offer_id: string | null
   job_offer?: { id: string; title: string; company: string; description?: string; skills?: string; experience?: string } | null
 }
@@ -80,6 +82,12 @@ export function CandidateDetailPage() {
   const [statusLoading, setStatusLoading] = useState(false)
   const [tab, setTab] = useState<Tab>('info')
 
+  // CV / cover letter state
+  const [coverLetter, setCoverLetter] = useState('')
+  const [savingCover, setSavingCover] = useState(false)
+  const [cvUploading, setCvUploading] = useState(false)
+  const { profile } = useAuth()
+
   // Interview scheduling state
   const [showSchedule, setShowSchedule] = useState(false)
   const [scheduleFor, setScheduleFor] = useState<1 | 2 | 3>(1)
@@ -97,6 +105,7 @@ export function CandidateDetailPage() {
         supabase.from('interviews').select('*, slots:interview_slots(*)').eq('candidate_id', id).order('interview_number'),
       ])
       setCandidate(c as Candidate)
+      setCoverLetter((c as Candidate)?.cover_letter || '')
       setInterviews((iv || []) as Interview[])
       setLoading(false)
     }
@@ -116,6 +125,31 @@ export function CandidateDetailPage() {
     if (!candidate || !window.confirm('Supprimer ce candidat ?')) return
     await supabase.from('candidates').delete().eq('id', candidate.id)
     navigate('/candidats')
+  }
+
+  const saveCoverLetter = async () => {
+    if (!candidate) return
+    setSavingCover(true)
+    await supabase.from('candidates').update({ cover_letter: coverLetter || null }).eq('id', candidate.id)
+    setCandidate(c => c ? { ...c, cover_letter: coverLetter || null } : c)
+    setSavingCover(false)
+  }
+
+  const uploadCv = async (file: File) => {
+    if (!candidate || !profile?.organization_id) return
+    setCvUploading(true)
+    const ext = file.name.split('.').pop()
+    const path = `${profile.organization_id}/${Date.now()}.${ext}`
+    const { error: upErr } = await supabase.storage.from('cvs').upload(path, file)
+    if (!upErr) {
+      const { data: urlData } = supabase.storage.from('cvs').getPublicUrl(path)
+      const cvUrl = urlData.publicUrl
+      let cvText: string | null = null
+      if (file.type !== 'application/pdf') cvText = await file.text()
+      await supabase.from('candidates').update({ cv_file_url: cvUrl, ...(cvText ? { cv_text: cvText } : {}) }).eq('id', candidate.id)
+      setCandidate(c => c ? { ...c, cv_file_url: cvUrl, ...(cvText ? { cv_text: cvText } : {}) } : c)
+    }
+    setCvUploading(false)
   }
 
   const openSchedule = async (num: 1 | 2 | 3) => {
@@ -375,32 +409,64 @@ export function CandidateDetailPage() {
       )}
 
       {tab === 'cv' && (
-        candidate.cv_text ? (
+        <div className="space-y-4">
+          {/* CV section */}
           <Card>
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-bold text-slate-900">CV</h2>
-              {candidate.cv_file_url && (
-                <a href={candidate.cv_file_url} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline">
-                  Télécharger le PDF
-                </a>
-              )}
+              <div className="flex items-center gap-3">
+                {candidate.cv_file_url && (
+                  <a href={candidate.cv_file_url} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline">
+                    Télécharger
+                  </a>
+                )}
+                <label className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 cursor-pointer hover:border-blue-300 transition-all ${cvUploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                  {cvUploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                  {cvUploading ? 'Upload...' : 'Remplacer'}
+                  <input type="file" accept=".pdf,.txt,.doc,.docx" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) uploadCv(f) }} />
+                </label>
+              </div>
             </div>
-            <pre className="text-xs text-slate-600 whitespace-pre-wrap font-mono leading-relaxed max-h-96 overflow-y-auto">
-              {candidate.cv_text}
-            </pre>
+            {candidate.cv_text ? (
+              <pre className="text-xs text-slate-600 whitespace-pre-wrap font-mono leading-relaxed max-h-96 overflow-y-auto">
+                {candidate.cv_text}
+              </pre>
+            ) : candidate.cv_file_url ? (
+              <p className="text-sm text-slate-500 py-4 text-center">CV en PDF — <a href={candidate.cv_file_url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">ouvrir</a></p>
+            ) : (
+              <p className="text-sm text-slate-400 py-4 text-center">Aucun CV enregistré.</p>
+            )}
           </Card>
-        ) : (
+
+          {/* Cover letter section */}
           <Card>
-            <div className="text-center py-8">
-              <p className="text-slate-500">Aucun CV enregistré.</p>
-              {candidate.cv_file_url && (
-                <a href={candidate.cv_file_url} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline mt-2 block">
-                  Voir le fichier CV
-                </a>
-              )}
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-slate-900">Lettre de motivation</h2>
+              <div className="flex items-center gap-2">
+                <label className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 cursor-pointer hover:border-blue-300 transition-all">
+                  <Upload size={13} /> Importer fichier
+                  <input type="file" accept=".txt,.pdf" className="hidden" onChange={async e => {
+                    const f = e.target.files?.[0]
+                    if (!f) return
+                    const text = await f.text()
+                    setCoverLetter(text)
+                  }} />
+                </label>
+                <Button size="sm" onClick={saveCoverLetter} loading={savingCover}>
+                  <Save size={13} /> Enregistrer
+                </Button>
+              </div>
             </div>
+            <textarea
+              value={coverLetter}
+              onChange={e => setCoverLetter(e.target.value)}
+              placeholder={'# Lettre de motivation\n\nMadame, Monsieur,\n\n...'}
+              rows={12}
+              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-600 resize-y"
+            />
+            <p className="text-xs text-slate-400 mt-2">Markdown supporté — titres (#), gras (**), listes (-)</p>
           </Card>
-        )
+        </div>
       )}
 
       {tab === 'entretiens' && (
