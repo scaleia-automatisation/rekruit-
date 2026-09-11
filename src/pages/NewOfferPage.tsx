@@ -200,7 +200,7 @@ export function NewOfferPage() {
                 <span>• Wizbii</span>
                 <span>• Site carrière de l'entreprise</span>
               </p>
-              <p className="font-semibold text-slate-600 pt-0.5">❌ Sites bloqués (copiez-collez le texte)</p>
+              <p className="font-semibold text-slate-600 pt-0.5">❌ Sites bloqués — utilisez l'onglet "Coller le texte"</p>
               <p className="flex flex-wrap gap-x-3 gap-y-1">
                 <span>• Indeed</span>
                 <span>• LinkedIn</span>
@@ -208,6 +208,9 @@ export function NewOfferPage() {
                 <span>• Monster</span>
                 <span>• APEC</span>
                 <span>• France Travail</span>
+              </p>
+              <p className="text-slate-400 italic pt-0.5">
+                💡 Pour ces sites : ouvrez la fiche de l'offre dans votre navigateur, sélectionnez tout le texte de la page (Ctrl+A puis Ctrl+C), puis cliquez sur <strong className="text-slate-500 not-italic">"Coller le texte"</strong> et collez (Ctrl+V).
               </p>
             </div>
           </div>
