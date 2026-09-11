@@ -71,11 +71,12 @@ export function NewCandidatePage() {
     setError('')
     try {
       const params: Record<string, unknown> = { job_offer: jobOffer || undefined }
-      if (file.type === 'application/pdf') {
-        params.cv_base64 = await fileToBase64(file)
-        params.cv_media_type = 'application/pdf'
-      } else {
+      const mimeType = file.type || 'application/octet-stream'
+      if (mimeType.startsWith('text/') || mimeType === 'application/json') {
         params.cv_text = await file.text()
+      } else {
+        params.cv_base64 = await fileToBase64(file)
+        params.cv_media_type = mimeType
       }
       if (cover) {
         params.cover_letter_text = await cover.text()
@@ -204,7 +205,7 @@ export function NewCandidatePage() {
                 dragOver ? 'border-blue-400 bg-blue-50' : cvFile ? 'border-green-300 bg-green-50' : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
               }`}
             >
-              <input ref={fileRef} type="file" accept=".pdf,.txt,.doc,.docx" onChange={e => { const f = e.target.files?.[0]; if (f) selectCv(f) }} className="hidden" />
+              <input ref={fileRef} type="file" accept=".pdf,.txt,.doc,.docx,.jpg,.jpeg,.png,.webp,.avif,.gif,.heic,.heif" onChange={e => { const f = e.target.files?.[0]; if (f) selectCv(f) }} className="hidden" />
               {cvFile ? (
                 <div className="flex items-center justify-center gap-2 flex-wrap">
                   <FileText size={20} className="text-green-600 shrink-0" />
@@ -217,7 +218,7 @@ export function NewCandidatePage() {
                 <>
                   <Upload size={28} className="text-slate-300 mb-2" />
                   <p className="font-medium text-slate-600 text-sm">Glissez ou cliquez</p>
-                  <p className="text-xs text-slate-400 mt-1">PDF, TXT, DOC</p>
+                  <p className="text-xs text-slate-400 mt-1">PDF, Image, DOC, TXT…</p>
                 </>
               )}
             </div>
