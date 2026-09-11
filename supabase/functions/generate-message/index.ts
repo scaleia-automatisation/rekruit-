@@ -12,8 +12,8 @@ Deno.serve(async (req: Request) => {
 
   try {
     const { type, candidate, job_offer, slots, interview_link } = await req.json()
-    const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
-    const model = Deno.env.get('AI_MODEL') || 'claude-opus-5'
+    const apiKey = Deno.env.get('OPENAI_API_KEY')
+    const model = Deno.env.get('AI_MODEL') || 'gpt-4o'
 
     const slotsText = slots?.map((s: { label: string }, i: number) => `Option ${i + 1}: ${s.label}`).join('\n') || ''
 
@@ -36,12 +36,11 @@ L'email doit être court, professionnel et enthousiaste. Signe avec l'équipe RH
 
     const prompt = prompts[type] || `Rédige un email professionnel à ${candidate?.first_name} ${candidate?.last_name} concernant sa candidature.`
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey!,
-        'anthropic-version': '2023-06-01',
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         model,
@@ -54,7 +53,7 @@ L'email doit être court, professionnel et enthousiaste. Signe avec l'équipe RH
     })
 
     const data = await response.json()
-    const message = data.content[0].text
+    const message = data.choices[0].message.content
 
     const subjects: Record<string, string> = {
       interview_invitation: `Invitation à un entretien - ${job_offer?.title}`,

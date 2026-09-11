@@ -12,39 +12,14 @@ Deno.serve(async (req: Request) => {
 
   try {
     const { cv_text, cv_base64, cv_media_type, cover_letter_text, job_offer } = await req.json()
-    const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
-    const model = Deno.env.get('AI_MODEL') || 'claude-opus-5'
+    const apiKey = Deno.env.get('OPENAI_API_KEY')
+    const model = Deno.env.get('AI_MODEL') || 'gpt-4o'
 
-    const jobContext = job_offer ? `\n\nOffre d'emploi ciblée:\nPoste: ${job_offer.title}\nEntreprise: ${job_offer.company}\nDescription: ${job_offer.description || ''}\nCompétences requises: ${job_offer.skills || ''}\nExpérience: ${job_offer.experience || ''}` : ''
+    const jobContext = job_offer
+      ? `\n\nOffre d'emploi ciblée:\nPoste: ${job_offer.title}\nEntreprise: ${job_offer.company}\nDescription: ${job_offer.description || ''}\nCompétences requises: ${job_offer.skills || ''}\nExpérience: ${job_offer.experience || ''}`
+      : ''
 
-    const userContent: unknown[] = []
-
-    if (cv_base64 && cv_media_type) {
-      userContent.push({
-        type: 'document',
-        source: {
-          type: 'base64',
-          media_type: cv_media_type,
-          data: cv_base64,
-        }
-      })
-    } else if (cv_text) {
-      userContent.push({
-        type: 'text',
-        text: `CV du candidat:\n${cv_text}`
-      })
-    }
-
-    if (cover_letter_text) {
-      userContent.push({
-        type: 'text',
-        text: `\nLettre de motivation:\n${cover_letter_text}`
-      })
-    }
-
-    userContent.push({
-      type: 'text',
-      text: `${jobContext}
+    const prompt = `${jobContext}
 
 Analyse ce candidat et réponds UNIQUEMENT avec un JSON valide:
 {
@@ -72,21 +47,35 @@ Analyse ce candidat et réponds UNIQUEMENT avec un JSON valide:
   "educations": [{"degree": "", "school": "", "year": ""}],
   "skills": ["skill1", "skill2"]
 }`
-    })
 
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey!,
-      'anthropic-version': '2023-06-01',
+    // Build message content — OpenAI supports image base64 but not PDF natively
+    type ContentPart =
+      | { type: 'text'; text: string }
+      | { type: 'image_url'; image_url: { url: string } }
+
+    const userContent: ContentPart[] = []
+
+    if (cv_base64 && cv_media_type && cv_media_type.startsWith('image/')) {
+      userContent.push({
+        type: 'image_url',
+        image_url: { url: `data:${cv_media_type};base64,${cv_base64}` }
+      })
+    } else if (cv_text) {
+      userContent.push({ type: 'text', text: `CV du candidat:\n${cv_text}` })
     }
 
-    if (cv_base64 && cv_media_type === 'application/pdf') {
-      headers['anthropic-beta'] = 'pdfs-2024-09-25'
+    if (cover_letter_text) {
+      userContent.push({ type: 'text', text: `\nLettre de motivation:\n${cover_letter_text}` })
     }
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    userContent.push({ type: 'text', text: prompt })
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
       body: JSON.stringify({
         model,
         max_tokens: 3000,
@@ -95,7 +84,7 @@ Analyse ce candidat et réponds UNIQUEMENT avec un JSON valide:
     })
 
     const data = await response.json()
-    const content = data.content[0].text
+    const content = data.choices[0].message.content
     const jsonMatch = content.match(/\{[\s\S]*\}/)
     const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : content)
 

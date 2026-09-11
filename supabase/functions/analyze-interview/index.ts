@@ -12,8 +12,8 @@ Deno.serve(async (req: Request) => {
 
   try {
     const { transcript, candidate, job_offer, interview_number } = await req.json()
-    const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
-    const model = Deno.env.get('AI_MODEL') || 'claude-opus-5'
+    const apiKey = Deno.env.get('OPENAI_API_KEY')
+    const model = Deno.env.get('AI_MODEL') || 'gpt-4o'
 
     const context = [
       candidate ? `Candidat: ${candidate.first_name} ${candidate.last_name}` : '',
@@ -21,12 +21,11 @@ Deno.serve(async (req: Request) => {
       interview_number ? `Entretien numéro: ${interview_number}` : '',
     ].filter(Boolean).join('\n')
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey!,
-        'anthropic-version': '2023-06-01',
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         model,
@@ -57,7 +56,7 @@ Analyse cet entretien et réponds UNIQUEMENT avec un JSON valide:
     })
 
     const data = await response.json()
-    const content = data.content[0].text
+    const content = data.choices[0].message.content
     const jsonMatch = content.match(/\{[\s\S]*\}/)
     const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : content)
 

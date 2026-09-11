@@ -26,15 +26,14 @@ Deno.serve(async (req: Request) => {
         .slice(0, 8000)
     }
 
-    const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
-    const model = Deno.env.get('AI_MODEL') || 'claude-opus-5'
+    const apiKey = Deno.env.get('OPENAI_API_KEY')
+    const model = Deno.env.get('AI_MODEL') || 'gpt-4o'
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey!,
-        'anthropic-version': '2023-06-01',
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         model,
@@ -67,8 +66,9 @@ Réponds UNIQUEMENT avec un JSON valide ayant ces champs:
     })
 
     const data = await response.json()
-    const content = data.content[0].text
-    const parsed = JSON.parse(content)
+    const content = data.choices[0].message.content
+    const jsonMatch = content.match(/\{[\s\S]*\}/)
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : content)
 
     return new Response(JSON.stringify(parsed), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
