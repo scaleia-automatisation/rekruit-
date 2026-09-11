@@ -2,7 +2,17 @@ import { supabase } from './supabase'
 
 export async function analyzeOffer(params: { text?: string; url?: string }) {
   const { data, error } = await supabase.functions.invoke('analyze-offer', { body: params })
-  if (error) throw error
+  if (error) {
+    // Try to extract the detailed message from the function response body
+    try {
+      const body = await (error as { context?: Response }).context?.json?.()
+      if (body?.error) throw new Error(body.error)
+    } catch (e) {
+      if (e instanceof Error && e.message !== '') throw e
+    }
+    throw error
+  }
+  if (data?.error) throw new Error(data.error)
   return data
 }
 

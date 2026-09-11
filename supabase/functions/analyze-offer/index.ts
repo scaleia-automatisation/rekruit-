@@ -15,6 +15,23 @@ Deno.serve(async (req: Request) => {
     let jobText = text || ''
 
     if (url && !jobText) {
+      // Sites known to block server-side fetches (Cloudflare / JS rendering required)
+      const blockedDomains = ['indeed.com', 'linkedin.com', 'glassdoor.com', 'monster.com', 'apec.fr', 'pole-emploi.fr', 'francetravail.fr']
+      const parsedUrl = new URL(url)
+      const hostname = parsedUrl.hostname.replace('www.', '')
+
+      const isBlocked = blockedDomains.some(d => hostname.endsWith(d))
+      if (isBlocked) {
+        throw new Error(`${hostname} bloque les accès automatiques (protection anti-robots). Ouvrez l'offre dans votre navigateur, sélectionnez tout le texte (Ctrl+A puis Ctrl+C) et collez-le dans l'onglet "Coller le texte".`)
+      }
+
+      // Detect search result pages instead of a single job offer
+      const searchPatterns = ['/jobs?', '/recherche?', '/offres?', '/search?', '/emploi?', '?q=', '?search=', '?query=', '&vjk=']
+      const isSearchPage = searchPatterns.some(p => url.includes(p)) && !url.includes('/job/') && !url.includes('/offre/') && !url.includes('/view/')
+      if (isSearchPage) {
+        throw new Error("L'URL pointe vers une liste de résultats, pas vers une offre précise. Ouvrez la fiche d'une offre spécifique, copiez l'URL de cette page et réessayez — ou collez directement le texte de l'offre.")
+      }
+
       const res = await fetch(url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -25,7 +42,7 @@ Deno.serve(async (req: Request) => {
         }
       })
       if (!res.ok) {
-        throw new Error(`Impossible d'accéder à l'URL (${res.status}). Copiez-collez le texte de l'offre directement.`)
+        throw new Error(`Impossible d'accéder à cette URL (erreur ${res.status}). Le site bloque peut-être les accès automatiques. Copiez-collez le texte de l'offre directement.`)
       }
       const html = await res.text()
       jobText = html
@@ -36,7 +53,7 @@ Deno.serve(async (req: Request) => {
         .trim()
         .slice(0, 8000)
       if (jobText.length < 200) {
-        throw new Error('Contenu insuffisant récupéré depuis cette URL (site protégé ?). Copiez-collez le texte de l\'offre directement.')
+        throw new Error('Le contenu récupéré est insuffisant — ce site utilise probablement JavaScript pour afficher l\'offre. Copiez-collez le texte de l\'offre directement.')
       }
     }
 
