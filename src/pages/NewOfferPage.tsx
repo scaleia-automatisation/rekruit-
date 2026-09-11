@@ -180,13 +180,37 @@ export function NewOfferPage() {
             className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 resize-none"
           />
         ) : (
-          <Input
-            label="URL de l'offre"
-            type="url"
-            placeholder="https://..."
-            value={inputUrl}
-            onChange={e => setInputUrl(e.target.value)}
-          />
+          <div className="space-y-2">
+            <Input
+              label="URL de l'offre"
+              type="url"
+              placeholder="https://..."
+              value={inputUrl}
+              onChange={e => setInputUrl(e.target.value)}
+            />
+            <div className="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-xs text-slate-500 space-y-1.5">
+              <p className="font-semibold text-slate-600">✅ Sites compatibles (lien direct)</p>
+              <p className="flex flex-wrap gap-x-3 gap-y-1">
+                <span>• Welcome to the Jungle</span>
+                <span>• HelloWork</span>
+                <span>• Jobteaser</span>
+                <span>• Cadremploi</span>
+                <span>• RegionsJob</span>
+                <span>• LesJeudis</span>
+                <span>• Wizbii</span>
+                <span>• Site carrière de l'entreprise</span>
+              </p>
+              <p className="font-semibold text-slate-600 pt-0.5">❌ Sites bloqués (copiez-collez le texte)</p>
+              <p className="flex flex-wrap gap-x-3 gap-y-1">
+                <span>• Indeed</span>
+                <span>• LinkedIn</span>
+                <span>• Glassdoor</span>
+                <span>• Monster</span>
+                <span>• APEC</span>
+                <span>• France Travail</span>
+              </p>
+            </div>
+          </div>
         )}
 
         <div className="mt-4">
