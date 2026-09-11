@@ -5,10 +5,6 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey)
 
-// Initialize lazily so a missing env var doesn't throw at module-eval time and
-// crash the entire app. The client is created on first use; if the credentials
-// are still missing at that point we surface a clear, actionable error instead
-// of the cryptic "supabaseUrl is required" from deep inside supabase-js.
 let client: SupabaseClient<Database> | null = null
 
 function getSupabaseClient(): SupabaseClient<Database> {

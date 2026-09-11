@@ -22,6 +22,7 @@ interface Offer {
   languages: string | null
   mandatory_criteria: string | null
   preferred_criteria: string | null
+  full_offer: string | null
   created_at: string
 }
 
@@ -212,6 +213,14 @@ export function OfferDetailPage() {
             <Card>
               <h3 className="font-bold text-slate-900 mb-2">Critères obligatoires</h3>
               <p className="text-sm text-slate-600">{offer.mandatory_criteria}</p>
+            </Card>
+          )}
+          {offer.full_offer && (
+            <Card>
+              <h3 className="font-bold text-slate-900 mb-3">Toute l'offre</h3>
+              <pre className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed font-sans overflow-auto max-h-96">
+                {offer.full_offer}
+              </pre>
             </Card>
           )}
         </div>
