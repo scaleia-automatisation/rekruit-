@@ -59,24 +59,32 @@ Deno.serve(async (req: Request) => {
 OFFRE À ANALYSER:
 ${jobText}
 
-Réponds UNIQUEMENT avec un JSON valide (sans markdown, sans backticks) ayant exactement ces champs.
-Pour chaque champ texte, sois exhaustif et fidèle au contenu original — ne résume pas, retranscris tout le contenu pertinent.
+Réponds UNIQUEMENT avec un objet JSON valide (aucun markdown autour, aucun backtick, juste le JSON brut).
+Sois exhaustif et fidèle au contenu original — ne résume pas, retranscris tout le contenu pertinent.
+Pour les champs à valeur fixe, choisis OBLIGATOIREMENT parmi les valeurs listées.
 
 {
   "title": "titre exact du poste",
   "company": "nom exact de l'entreprise",
-  "location": "lieu complet (ville, département, pays, remote/hybride si mentionné)",
-  "contract_type": "CDI|CDD|Stage|Freelance|Alternance",
-  "salary_range": "fourchette salariale exacte avec avantages si mentionnés (sinon chaîne vide)",
-  "description": "description complète du poste et du contexte de l'entreprise, sans rien couper",
-  "missions": "liste complète de TOUTES les missions et responsabilités, une par ligne avec tiret",
-  "skills": "liste complète de TOUTES les compétences techniques et outils mentionnés, une par ligne avec tiret",
-  "experience": "niveau et années d'expérience requis, avec le contexte exact mentionné",
-  "education": "niveau d'études et formations requis, exacts",
+  "sector": "secteur d'activité de l'entreprise (ex: Technologie, Finance, Santé, Industrie…)",
+  "location": "ville et pays complets",
+  "remote_policy": "EXACTEMENT l'une de ces valeurs : Présentiel | Hybride | Full Remote",
+  "contract_type": "EXACTEMENT l'une de ces valeurs : CDI | CDD | Stage | Alternance | Freelance",
+  "work_schedule": "EXACTEMENT l'une de ces valeurs : Temps plein | Temps partiel | Autre",
+  "salary_range": "rémunération exacte avec tous les détails (fourchette, fixe+variable, avantages financiers) — chaîne vide si non mentionné",
+  "start_date": "date ou délai de prise de poste (ex: Immédiat, Dès que possible, Janvier 2026) — chaîne vide si non mentionné",
+  "description": "description complète du poste ET du contexte/présentation de l'entreprise, sans rien couper",
+  "missions": "liste complète de TOUTES les missions et responsabilités, une par ligne avec tiret (- mission)",
+  "skills": "liste complète de TOUTES les compétences techniques, outils, frameworks, logiciels mentionnés, une par ligne avec tiret",
+  "experience": "niveau et années d'expérience requis avec le contexte exact de l'offre",
+  "education": "niveau d'études, diplômes et formations requis ou souhaités, exacts",
   "languages": "toutes les langues requises ou souhaitées avec le niveau si précisé",
+  "benefits": "liste complète de TOUS les avantages : RTT, tickets restaurant, mutuelle, télétravail, primes, CE, véhicule, formations, etc. — une par ligne avec tiret",
+  "team_size": "taille de l'équipe, contexte d'équipe, hiérarchie, environnement de travail si mentionnés",
   "mandatory_criteria": "liste de tous les critères absolument requis (must-have), un par ligne avec tiret",
   "preferred_criteria": "liste de tous les critères appréciés mais non obligatoires (nice-to-have), un par ligne avec tiret",
-  "full_offer": "reproduction complète et fidèle de l'offre en Markdown bien structuré avec # pour le titre, ## pour chaque section, et - pour les listes. Inclure TOUTES les sections sans exception."
+  "recruitment_process": "étapes du processus de recrutement si mentionnées (entretiens, tests, délais…)",
+  "full_offer": "reproduction complète et fidèle de TOUTE l'offre en Markdown structuré : # Titre, **méta en gras**, puis ## pour chaque section (Description, Missions, Compétences, Profil recherché, Avantages, Processus…), et - pour chaque item de liste. N'omets AUCUNE information présente dans l'offre originale."
 }`
         }]
       })
