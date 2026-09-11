@@ -9,6 +9,30 @@ import { Input } from '../components/ui/Input'
 
 const contractTypes = ['CDI', 'CDD', 'Stage', 'Alternance', 'Freelance']
 
+type OfferForm = {
+  title: string; company: string; location: string; contract_type: string; salary_range: string;
+  description: string; missions: string; skills: string; experience: string; education: string;
+  languages: string; mandatory_criteria: string; preferred_criteria: string; full_offer: string;
+}
+
+function buildMarkdown(f: OfferForm): string {
+  const lines: string[] = []
+  if (f.title)               lines.push(`# ${f.title}`)
+  if (f.company || f.location || f.contract_type) {
+    const meta = [f.company, f.location, f.contract_type, f.salary_range].filter(Boolean).join(' · ')
+    lines.push(`**${meta}**`)
+  }
+  if (f.description)         lines.push(`\n## Description\n${f.description}`)
+  if (f.missions)            lines.push(`\n## Missions\n${f.missions}`)
+  if (f.skills)              lines.push(`\n## Compétences requises\n${f.skills}`)
+  if (f.experience)          lines.push(`\n## Expérience\n${f.experience}`)
+  if (f.education)           lines.push(`\n## Formation\n${f.education}`)
+  if (f.languages)           lines.push(`\n## Langues\n${f.languages}`)
+  if (f.mandatory_criteria)  lines.push(`\n## Critères obligatoires\n${f.mandatory_criteria}`)
+  if (f.preferred_criteria)  lines.push(`\n## Critères appréciés\n${f.preferred_criteria}`)
+  return lines.join('\n')
+}
+
 export function NewOfferPage() {
   const { profile } = useAuth()
   const navigate = useNavigate()
@@ -17,15 +41,19 @@ export function NewOfferPage() {
   const [inputUrl, setInputUrl] = useState('')
   const [analyzing, setAnalyzing] = useState(false)
   const [analyzed, setAnalyzed] = useState(false)
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<OfferForm>({
     title: '', company: '', location: '', contract_type: 'CDI', salary_range: '',
     description: '', missions: '', skills: '', experience: '', education: '',
-    languages: '', mandatory_criteria: '', preferred_criteria: '',
+    languages: '', mandatory_criteria: '', preferred_criteria: '', full_offer: '',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
+  const set = (k: string, v: string) => setForm(f => {
+    const next = { ...f, [k]: v }
+    if (k !== 'full_offer') next.full_offer = buildMarkdown(next)
+    return next
+  })
 
   const runAnalysis = async () => {
     const params = tab === 'text' ? { text: inputText } : { url: inputUrl }
@@ -34,7 +62,11 @@ export function NewOfferPage() {
     setError('')
     try {
       const data = await analyzeOffer(params)
-      setForm(f => ({ ...f, ...Object.fromEntries(Object.entries(data).filter(([, v]) => v !== null && v !== undefined && v !== '')) }))
+      setForm(f => {
+        const next = { ...f, ...Object.fromEntries(Object.entries(data).filter(([, v]) => v !== null && v !== undefined && v !== '')) } as OfferForm
+        next.full_offer = buildMarkdown(next)
+        return next
+      })
       setAnalyzed(true)
     } catch {
       setError("Analyse impossible. Vérifiez votre connexion ou collez le texte directement.")
@@ -157,6 +189,17 @@ export function NewOfferPage() {
             <Input label="Formation" value={form.education} onChange={e => set('education', e.target.value)} />
             <Input label="Langues" value={form.languages} onChange={e => set('languages', e.target.value)} />
           </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Toute l'offre <span className="text-slate-400 font-normal">(Markdown — généré automatiquement, modifiable)</span></label>
+          <textarea
+            value={form.full_offer}
+            onChange={e => setForm(f => ({ ...f, full_offer: e.target.value }))}
+            rows={14}
+            placeholder="L'analyse IA remplira ce champ automatiquement, ou saisissez manuellement le contenu complet de l'offre en Markdown."
+            className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-600 resize-y"
+          />
         </div>
 
         <div className="pt-4 border-t border-slate-100 flex gap-3">
