@@ -1,6 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
-import { ToastProvider } from './contexts/ToastContext'
 import { AppLayout } from './components/layout/AppLayout'
 import { ProtectedRoute } from './components/layout/ProtectedRoute'
 import { PublicRoute } from './components/layout/PublicRoute'
@@ -379,10 +378,8 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <ToastProvider>
-          <AppRoutes />
-          <CookieBanner />
-        </ToastProvider>
+        <AppRoutes />
+        <CookieBanner />
       </AuthProvider>
     </BrowserRouter>
   )
