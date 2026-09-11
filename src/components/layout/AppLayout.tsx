@@ -1,20 +1,26 @@
-import { type ReactNode, useState } from 'react'
-import { NavLink, useNavigate, Link } from 'react-router-dom'
-import { clsx } from 'clsx'
+import { type ReactNode, useState, useEffect } from 'react'
+import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Briefcase, Users, CalendarDays, Settings,
-  LogOut, User, Menu, X, BarChart3, CreditCard, Shield, UserCog,
+  LogOut, Menu, X, BarChart3, Shield, UserCog,
+  Search, Bell, ChevronDown, Zap,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
+import { CommandPalette } from '../CommandPalette'
 
 const navItems = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/offres', icon: Briefcase, label: 'Offres' },
-  { to: '/candidats', icon: Users, label: 'Candidats' },
-  { to: '/calendrier', icon: CalendarDays, label: 'Calendrier' },
-  { to: '/analytics', icon: BarChart3, label: 'Analytics' },
-  { to: '/parametres', icon: Settings, label: 'Paramètres' },
+  { to: '/dashboard',  icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/offres',     icon: Briefcase,        label: 'Offres' },
+  { to: '/candidats',  icon: Users,            label: 'Candidats' },
+  { to: '/calendrier', icon: CalendarDays,     label: 'Calendrier' },
+  { to: '/analytics',  icon: BarChart3,        label: 'Analytics' },
 ]
+
+const planLabels: Record<string, { label: string; color: string }> = {
+  free:    { label: 'Gratuit', color: 'text-[var(--text-muted)]' },
+  tpe_pme: { label: 'Pro',     color: 'text-[var(--cyan-700)]' },
+  agence:  { label: 'Business',color: 'text-violet-600' },
+}
 
 interface AppLayoutProps {
   children: ReactNode
@@ -23,7 +29,11 @@ interface AppLayoutProps {
 export function AppLayout({ children }: AppLayoutProps) {
   const { profile, organization, signOut, isSuperAdmin, planId } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [cmdOpen, setCmdOpen] = useState(false)
+
+  const plan = planLabels[planId ?? 'free'] ?? planLabels.free
 
   const handleSignOut = async () => {
     await signOut()
@@ -34,193 +44,280 @@ export function AppLayout({ children }: AppLayoutProps) {
     ? `${profile.first_name?.[0] ?? ''}${profile.last_name?.[0] ?? ''}`.toUpperCase() || '?'
     : '?'
 
-  const NavItems = () => (
-    <>
-      {navItems.map(({ to, icon: Icon, label }) => (
-        <NavLink
-          key={to}
-          to={to}
-          onClick={() => setMobileOpen(false)}
-          className={({ isActive }) => clsx(
-            'flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all',
-            isActive
-              ? 'bg-blue-600 text-white shadow-sm'
-              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-          )}
-        >
-          <Icon size={18} />
-          {label}
-        </NavLink>
-      ))}
-    </>
+  /* ⌘K / Ctrl+K */
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setCmdOpen(v => !v)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
+  /* Close mobile on route change */
+  useEffect(() => { setMobileOpen(false) }, [location.pathname])
+
+  const SidebarNav = () => (
+    <nav className="flex-1 px-2 py-2">
+      <p className="px-3 pt-1 pb-2 text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-widest">
+        Menu
+      </p>
+      <ul className="space-y-0.5">
+        {navItems.map(({ to, icon: Icon, label }) => (
+          <li key={to}>
+            <NavLink
+              to={to}
+              className={({ isActive }) =>
+                `group flex items-center gap-2.5 px-3 py-2 rounded-[var(--radius-md)] text-[13.5px] font-medium transition-all duration-150 relative ${
+                  isActive
+                    ? 'bg-[var(--cyan-05)] text-[var(--text-primary)]'
+                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg)] hover:text-[var(--text-primary)]'
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  {isActive && (
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-[var(--cyan)] rounded-r-full" />
+                  )}
+                  <Icon
+                    size={16}
+                    className={`shrink-0 transition-colors ${
+                      isActive ? 'text-[var(--cyan-700)]' : 'text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]'
+                    }`}
+                  />
+                  {label}
+                </>
+              )}
+            </NavLink>
+          </li>
+        ))}
+      </ul>
+    </nav>
   )
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
-      {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-64 flex-col bg-white border-r border-slate-200 shrink-0">
-        {/* Logo */}
-        <div className="flex items-center gap-2.5 px-6 py-5 border-b border-slate-100">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">R</span>
+    <div className="flex h-screen bg-[var(--bg)] overflow-hidden">
+      {/* ── Desktop Sidebar ──────────────────────────────── */}
+      <aside className="hidden md:flex w-[220px] flex-col bg-[var(--surface)] border-r border-[var(--border)] shrink-0">
+
+        {/* Logo + workspace */}
+        <div className="px-4 pt-4 pb-3">
+          <div className="flex items-center gap-2.5 mb-3">
+            <div className="w-7 h-7 bg-[var(--text-primary)] rounded-[var(--radius-sm)] flex items-center justify-center shrink-0">
+              <span className="text-[var(--cyan)] font-bold text-xs tracking-tight">R</span>
+            </div>
+            <span className="font-bold text-[var(--text-primary)] text-[15px] tracking-tight">rekruit</span>
           </div>
-          <span className="font-bold text-slate-900 text-lg">rekruit</span>
+          {organization && (
+            <button className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-[var(--radius-sm)] bg-[var(--bg)] border border-[var(--border)] hover:border-[var(--border-strong)] transition-colors group">
+              <div className="w-5 h-5 bg-[var(--cyan-10)] rounded-sm flex items-center justify-center shrink-0">
+                <span className="text-[var(--cyan-700)] text-[9px] font-bold">{organization.name[0]}</span>
+              </div>
+              <span className="text-xs text-[var(--text-secondary)] font-medium truncate flex-1 text-left">{organization.name}</span>
+              <ChevronDown size={12} className="text-[var(--text-muted)] shrink-0 group-hover:text-[var(--text-secondary)] transition-colors" />
+            </button>
+          )}
         </div>
 
-        {/* Org name */}
-        {organization && (
-          <div className="px-6 py-3 border-b border-slate-100">
-            <p className="text-xs text-slate-500 truncate">{organization.name}</p>
-          </div>
-        )}
+        {/* Search / ⌘K */}
+        <div className="px-2 pb-2">
+          <button
+            onClick={() => setCmdOpen(true)}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-[var(--radius-md)] bg-[var(--bg)] border border-[var(--border)] hover:border-[var(--border-strong)] text-[var(--text-muted)] text-xs transition-all hover:text-[var(--text-secondary)] group"
+          >
+            <Search size={13} className="shrink-0" />
+            <span className="flex-1 text-left">Rechercher...</span>
+            <kbd className="hidden group-hover:flex items-center gap-0.5 font-mono text-[10px] bg-[var(--surface)] border border-[var(--border)] rounded px-1 py-0.5">
+              ⌘K
+            </kbd>
+          </button>
+        </div>
 
-        {/* Nav */}
-        <nav className="flex-1 px-3 py-4 flex flex-col gap-1">
-          <NavItems />
-        </nav>
+        <SidebarNav />
 
-        {/* Bottom */}
-        <div className="px-3 py-4 border-t border-slate-100 flex flex-col gap-1">
-          {/* Plan badge */}
-          <Link to="/billing" className="flex items-center gap-2 px-4 py-2 rounded-xl hover:bg-slate-50 transition-colors group">
-            <CreditCard size={14} className="text-slate-400 group-hover:text-blue-600" />
-            <span className="text-xs font-semibold text-slate-500 group-hover:text-slate-700">
-              Plan {planId === 'free' ? 'Free' : planId === 'tpe_pme' ? 'Pro' : 'Business'}
-            </span>
-          </Link>
+        {/* Bottom section */}
+        <div className="px-2 py-3 border-t border-[var(--border)] space-y-0.5">
+          {/* Plan indicator */}
+          <NavLink
+            to="/billing"
+            className="flex items-center gap-2.5 px-3 py-2 rounded-[var(--radius-md)] text-[13px] text-[var(--text-muted)] hover:bg-[var(--bg)] hover:text-[var(--text-secondary)] transition-all group"
+          >
+            <Zap size={14} className={`shrink-0 ${plan.color}`} />
+            <span className={`font-medium ${plan.color}`}>{plan.label}</span>
+            {planId === 'free' && (
+              <span className="ml-auto text-[10px] text-[var(--cyan-700)] bg-[var(--cyan-05)] px-1.5 py-0.5 rounded-full border border-[var(--cyan-20)] font-medium">
+                Upgrade
+              </span>
+            )}
+          </NavLink>
+
+          <NavLink
+            to="/parametres"
+            className={({ isActive }) =>
+              `flex items-center gap-2.5 px-3 py-2 rounded-[var(--radius-md)] text-[13px] font-medium transition-all ${
+                isActive
+                  ? 'bg-[var(--cyan-05)] text-[var(--text-primary)]'
+                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg)] hover:text-[var(--text-primary)]'
+              }`
+            }
+          >
+            {({ isActive }) => (
+              <>
+                <Settings size={15} className={`shrink-0 ${isActive ? 'text-[var(--cyan-700)]' : 'text-[var(--text-muted)]'}`} />
+                Paramètres
+              </>
+            )}
+          </NavLink>
 
           {profile?.role === 'admin' && (
-            <NavLink to="/admin"
-              className={({ isActive }) => clsx(
-                'flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all',
-                isActive ? 'bg-violet-50 text-violet-700' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
-              )}>
-              <UserCog size={16} />
-              Admin
+            <NavLink
+              to="/admin"
+              className={({ isActive }) =>
+                `flex items-center gap-2.5 px-3 py-2 rounded-[var(--radius-md)] text-[13px] font-medium transition-all ${
+                  isActive ? 'bg-violet-50 text-violet-700' : 'text-[var(--text-secondary)] hover:bg-[var(--bg)] hover:text-[var(--text-primary)]'
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <UserCog size={15} className={`shrink-0 ${isActive ? 'text-violet-600' : 'text-[var(--text-muted)]'}`} />
+                  Admin
+                </>
+              )}
             </NavLink>
           )}
 
           {isSuperAdmin && (
-            <NavLink to="/super-admin"
-              className={({ isActive }) => clsx(
-                'flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all',
-                isActive ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-900 hover:text-white'
-              )}>
-              <Shield size={16} />
-              Super Admin
+            <NavLink
+              to="/super-admin"
+              className={({ isActive }) =>
+                `flex items-center gap-2.5 px-3 py-2 rounded-[var(--radius-md)] text-[13px] font-medium transition-all ${
+                  isActive ? 'bg-slate-900 text-white' : 'text-[var(--text-secondary)] hover:bg-slate-900 hover:text-white'
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <Shield size={15} className={`shrink-0 ${isActive ? 'text-white' : 'text-[var(--text-muted)]'}`} />
+                  Super Admin
+                </>
+              )}
             </NavLink>
           )}
 
+          {/* User */}
           <NavLink
             to="/mon-compte"
-            className={({ isActive }) => clsx(
-              'flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all',
-              isActive
-                ? 'bg-blue-600 text-white'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-            )}
+            className={({ isActive }) =>
+              `flex items-center gap-2.5 px-3 py-2 rounded-[var(--radius-md)] text-[13px] font-medium transition-all mt-1 ${
+                isActive ? 'bg-[var(--cyan-05)]' : 'hover:bg-[var(--bg)]'
+              }`
+            }
           >
-            <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
-              <span className="text-blue-700 text-xs font-bold">{initials}</span>
+            <div className="w-6 h-6 rounded-full bg-[var(--text-primary)] flex items-center justify-center shrink-0">
+              <span className="text-[9px] font-bold text-[var(--cyan)]">{initials}</span>
             </div>
-            <span className="truncate">{profile?.first_name} {profile?.last_name}</span>
+            <span className="text-[var(--text-secondary)] truncate">{profile?.first_name} {profile?.last_name}</span>
           </NavLink>
+
           <button
             onClick={handleSignOut}
-            className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-all w-full text-left"
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-[var(--radius-md)] text-[13px] font-medium text-[var(--text-muted)] hover:bg-[var(--bg)] hover:text-[var(--error)] transition-all text-left"
           >
-            <LogOut size={18} />
+            <LogOut size={14} className="shrink-0" />
             Déconnexion
           </button>
         </div>
       </aside>
 
-      {/* Mobile overlay */}
+      {/* ── Mobile overlay ──────────────────────────────── */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 bg-black/40 z-40 md:hidden"
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 md:hidden"
           onClick={() => setMobileOpen(false)}
         />
       )}
 
-      {/* Mobile Sidebar */}
-      <aside className={clsx(
-        'fixed inset-y-0 left-0 w-72 bg-white border-r border-slate-200 z-50 flex flex-col transition-transform duration-300 md:hidden',
-        mobileOpen ? 'translate-x-0' : '-translate-x-full'
-      )}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+      {/* ── Mobile Sidebar ──────────────────────────────── */}
+      <aside className={`fixed inset-y-0 left-0 w-[260px] bg-[var(--surface)] border-r border-[var(--border)] z-50 flex flex-col transition-transform duration-300 ease-out md:hidden ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="flex items-center justify-between px-4 py-4 border-b border-[var(--border)]">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">R</span>
+            <div className="w-7 h-7 bg-[var(--text-primary)] rounded-[var(--radius-sm)] flex items-center justify-center">
+              <span className="text-[var(--cyan)] font-bold text-xs">R</span>
             </div>
-            <span className="font-bold text-slate-900 text-lg">rekruit</span>
+            <span className="font-bold text-[var(--text-primary)] text-[15px]">rekruit</span>
           </div>
-          <button onClick={() => setMobileOpen(false)} className="p-2 rounded-lg hover:bg-slate-100">
-            <X size={20} className="text-slate-600" />
+          <button onClick={() => setMobileOpen(false)} className="p-1.5 rounded-[var(--radius-sm)] hover:bg-[var(--bg)] text-[var(--text-muted)] transition-colors">
+            <X size={18} />
           </button>
         </div>
-        <nav className="flex-1 px-3 py-4 flex flex-col gap-1">
-          <NavItems />
-        </nav>
-        <div className="px-3 py-4 border-t border-slate-100 flex flex-col gap-1">
-          <NavLink to="/mon-compte" onClick={() => setMobileOpen(false)}
-            className={({ isActive }) => clsx(
-              'flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all',
-              isActive ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'
-            )}>
-            <User size={18} />
-            Mon compte
+        <SidebarNav />
+        <div className="px-2 py-3 border-t border-[var(--border)] space-y-0.5">
+          <NavLink to="/parametres" onClick={() => setMobileOpen(false)}
+            className="flex items-center gap-2.5 px-3 py-2 rounded-[var(--radius-md)] text-[13px] text-[var(--text-secondary)] hover:bg-[var(--bg)] transition-all">
+            <Settings size={15} className="text-[var(--text-muted)]" />
+            Paramètres
           </NavLink>
-          <button
-            onClick={handleSignOut}
-            className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-500 hover:bg-slate-100 transition-all w-full text-left"
-          >
-            <LogOut size={18} />
+          <button onClick={handleSignOut}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-[var(--radius-md)] text-[13px] text-[var(--text-muted)] hover:text-[var(--error)] hover:bg-[var(--bg)] transition-all text-left">
+            <LogOut size={14} />
             Déconnexion
           </button>
         </div>
       </aside>
 
-      {/* Main */}
+      {/* ── Main area ──────────────────────────────────── */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Mobile header */}
-        <header className="md:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-slate-200">
-          <button onClick={() => setMobileOpen(true)} className="p-2 rounded-lg hover:bg-slate-100">
-            <Menu size={22} className="text-slate-700" />
+        {/* Mobile topbar */}
+        <header className="md:hidden flex items-center justify-between px-4 py-3 bg-[var(--surface)] border-b border-[var(--border)]">
+          <button onClick={() => setMobileOpen(true)} className="p-1.5 rounded-[var(--radius-sm)] hover:bg-[var(--bg)] text-[var(--text-secondary)] transition-colors">
+            <Menu size={20} />
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-xs">R</span>
+            <div className="w-6 h-6 bg-[var(--text-primary)] rounded-[var(--radius-xs)] flex items-center justify-center">
+              <span className="text-[var(--cyan)] font-bold text-[10px]">R</span>
             </div>
-            <span className="font-bold text-slate-900">rekruit</span>
+            <span className="font-bold text-[var(--text-primary)] text-sm">rekruit</span>
           </div>
-          <div className="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center">
-            <span className="text-blue-700 text-sm font-bold">{initials}</span>
-          </div>
+          <button className="p-1.5 rounded-[var(--radius-sm)] hover:bg-[var(--bg)] text-[var(--text-secondary)] transition-colors relative">
+            <Bell size={18} />
+          </button>
         </header>
 
-        {/* Content */}
+        {/* Page content */}
         <main className="flex-1 overflow-y-auto">
           {children}
         </main>
 
         {/* Mobile bottom nav */}
-        <nav className="md:hidden flex items-center bg-white border-t border-slate-200 safe-area-bottom">
+        <nav className="md:hidden flex items-center bg-[var(--surface)] border-t border-[var(--border)]">
           {navItems.slice(0, 4).map(({ to, icon: Icon, label }) => (
             <NavLink
               key={to}
               to={to}
-              className={({ isActive }) => clsx(
-                'flex-1 flex flex-col items-center gap-1 py-2 text-xs font-medium transition-colors',
-                isActive ? 'text-blue-600' : 'text-slate-500'
-              )}
+              className={({ isActive }) =>
+                `flex-1 flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors ${
+                  isActive ? 'text-[var(--cyan-700)]' : 'text-[var(--text-muted)]'
+                }`
+              }
             >
-              <Icon size={22} />
-              {label}
+              {({ isActive }) => (
+                <>
+                  <Icon size={20} />
+                  {label}
+                  {isActive && <span className="absolute bottom-0 w-8 h-[2px] bg-[var(--cyan)] rounded-t-full" />}
+                </>
+              )}
             </NavLink>
           ))}
         </nav>
       </div>
+
+      {/* Command Palette */}
+      <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
     </div>
   )
 }
