@@ -7,6 +7,9 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { generateMessage } from '../lib/ai'
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { Card } from '../components/ui/Card'
@@ -201,13 +204,28 @@ export function CandidateDetailPage() {
       }).select().single()
 
       await updateStatus(`interview_${scheduleFor}` as CandidateStatus)
-      if (token) {
+      if (token && candidate.email && msgBody) {
+        const finalBody = msgBody.replace(/\[TOKEN\]/g, token.token)
+        // Send email to candidate via Resend
+        await fetch(`${SUPABASE_URL}/functions/v1/send-interview-invitation`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            to: candidate.email,
+            subject: msgSubject,
+            body: finalBody,
+          }),
+        })
+        // Save message log
         await supabase.from('messages').insert({
           candidate_id: candidate.id,
           organization_id: (candidate as unknown as { organization_id: string }).organization_id,
           type: 'email',
           subject: msgSubject,
-          body: msgBody,
+          content: finalBody,
           status: 'sent',
         }).then(() => {})
       }
