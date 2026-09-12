@@ -102,7 +102,16 @@ export function NewCandidatePage() {
         params.cv_media_type = mimeType
       }
       if (cover) {
-        params.cover_letter_text = await cover.text()
+        const coverMime = cover.type || 'application/octet-stream'
+        if (coverMime.startsWith('text/') || coverMime === 'application/json') {
+          params.cover_letter_text = await cover.text()
+        } else if (coverMime.startsWith('image/') && !OPENAI_VISION_TYPES.has(coverMime)) {
+          params.cover_letter_base64 = await convertImageToJpeg(cover)
+          params.cover_letter_media_type = 'image/jpeg'
+        } else {
+          params.cover_letter_base64 = await fileToBase64(cover)
+          params.cover_letter_media_type = coverMime
+        }
       } else if (coverText.trim()) {
         params.cover_letter_text = coverText.trim()
       }
@@ -146,8 +155,20 @@ export function NewCandidatePage() {
     }
 
     let coverLetterText = coverText.trim() || null
+    let coverLetterUrl: string | null = null
     if (!coverLetterText && coverFile) {
-      coverLetterText = await coverFile.text()
+      const coverMime = coverFile.type || 'application/octet-stream'
+      if (coverMime.startsWith('text/')) {
+        coverLetterText = await coverFile.text()
+      } else {
+        const ext = coverFile.name.split('.').pop()
+        const path = `covers/${profile.organization_id}/${Date.now()}.${ext}`
+        const { error: coverErr } = await supabase.storage.from('cvs').upload(path, coverFile)
+        if (!coverErr) {
+          const { data: urlData } = supabase.storage.from('cvs').getPublicUrl(path)
+          coverLetterUrl = urlData.publicUrl
+        }
+      }
     }
 
     const payload: Record<string, unknown> = {
@@ -157,6 +178,7 @@ export function NewCandidatePage() {
       status: 'new',
       cv_file_url: cvUrl,
       cover_letter: coverLetterText,
+      cover_letter_url: coverLetterUrl,
     }
 
     if (aiData) {
@@ -304,7 +326,7 @@ export function NewCandidatePage() {
                     <Upload size={28} className="text-slate-300 mb-2" />
                     <label className="cursor-pointer text-sm font-medium text-slate-600 hover:text-blue-600">
                       Sélectionner un fichier
-                      <input type="file" accept=".pdf,.txt" className="hidden" onChange={e => setCoverFile(e.target.files?.[0] || null)} />
+                      <input type="file" accept=".pdf,.txt,.doc,.docx,.jpg,.jpeg,.png,.webp,.avif,.gif,.heic,.heif" className="hidden" onChange={e => setCoverFile(e.target.files?.[0] || null)} />
                     </label>
                     <p className="text-xs text-slate-400 mt-1">PDF, TXT</p>
                   </>
