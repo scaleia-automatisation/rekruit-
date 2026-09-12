@@ -183,6 +183,9 @@ export function NewCandidatePage() {
 
     if (aiData) {
       Object.assign(payload, {
+        current_title: aiData.current_title,
+        years_experience: aiData.years_experience,
+        education_level: aiData.education_level,
         score_global: aiData.score_global,
         score_skills: aiData.score_skills,
         score_experience: aiData.score_experience,
@@ -195,6 +198,9 @@ export function NewCandidatePage() {
         ai_weaknesses: aiData.ai_weaknesses,
         missing_skills: aiData.missing_skills,
         progression: aiData.progression || 20,
+        experiences: aiData.experiences || null,
+        educations: aiData.educations || null,
+        skills: aiData.skills || null,
         cv_text: typeof aiData.cv_text === 'string' ? aiData.cv_text : undefined,
         status: 'analyzed',
       })
