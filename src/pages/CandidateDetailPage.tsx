@@ -18,7 +18,7 @@ import { ScoreDisplay } from '../components/ai/ScoreDisplay'
 import { SlotPicker, type Slot } from '../components/interviews/SlotPicker'
 import { MessageEditor } from '../components/interviews/MessageEditor'
 
-type CandidateStatus = 'new' | 'analyzing' | 'analyzed' | 'shortlisted' | 'interview_1' | 'interview_2' | 'interview_3' | 'offer' | 'hired' | 'rejected' | 'pool'
+type CandidateStatus = 'new' | 'analyzing' | 'analyzed' | 'shortlisted' | 'interview_1' | 'interview_2' | 'interview_3' | 'offer' | 'hired' | 'rejected' | 'pool' | 'unavailable' | 'not_looking'
 
 interface Candidate {
   id: string
@@ -70,6 +70,8 @@ const statusConfig: Record<string, { label: string; variant: 'blue' | 'green' | 
   hired: { label: 'Recruté', variant: 'green' },
   rejected: { label: 'Refusé', variant: 'red' },
   pool: { label: 'Vivier', variant: 'gray' },
+  unavailable: { label: 'Indisponible', variant: 'orange' },
+  not_looking: { label: 'Ne recherche plus', variant: 'red' },
 }
 
 const pipeline: CandidateStatus[] = ['new', 'analyzed', 'shortlisted', 'interview_1', 'interview_2', 'interview_3', 'hired']
@@ -118,7 +120,7 @@ export function CandidateDetailPage() {
   const updateStatus = async (status: CandidateStatus) => {
     if (!candidate) return
     setStatusLoading(true)
-    const progression = { new: 0, analyzing: 10, analyzed: 20, shortlisted: 30, interview_1: 40, interview_2: 60, interview_3: 80, offer: 90, hired: 100, rejected: 0, pool: 20 }[status] || 0
+    const progression = { new: 0, analyzing: 10, analyzed: 20, shortlisted: 30, interview_1: 40, interview_2: 60, interview_3: 80, offer: 90, hired: 100, rejected: 0, pool: 20, unavailable: 0, not_looking: 0 }[status] || 0
     const { data } = await supabase.from('candidates').update({ status, progression }).eq('id', candidate.id).select().single()
     if (data) setCandidate(c => c ? { ...c, status: data.status, progression: data.progression } : c)
     setStatusLoading(false)

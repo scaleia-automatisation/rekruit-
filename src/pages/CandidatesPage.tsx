@@ -32,6 +32,8 @@ const statusConfig: Record<string, { label: string; variant: 'blue' | 'green' | 
   hired: { label: 'Recruté', variant: 'green' },
   rejected: { label: 'Refusé', variant: 'red' },
   pool: { label: 'Vivier', variant: 'gray' },
+  unavailable: { label: 'Indisponible', variant: 'orange' },
+  not_looking: { label: 'Ne recherche plus', variant: 'red' },
 }
 
 export function CandidatesPage() {
