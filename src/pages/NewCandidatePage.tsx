@@ -65,6 +65,25 @@ export function NewCandidatePage() {
       reader.readAsDataURL(file)
     })
 
+  // Converts unsupported image formats (AVIF, HEIC, etc.) to JPEG via Canvas
+  const convertImageToJpeg = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const img = new Image()
+      const url = URL.createObjectURL(file)
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.naturalWidth
+        canvas.height = img.naturalHeight
+        canvas.getContext('2d')!.drawImage(img, 0, 0)
+        URL.revokeObjectURL(url)
+        resolve(canvas.toDataURL('image/jpeg', 0.92).split(',')[1])
+      }
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image load failed')) }
+      img.src = url
+    })
+
+  const OPENAI_VISION_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+
   const runAnalysis = async (file: File, cover?: File | null) => {
     setAnalyzing(true)
     setAnalyzed(false)
@@ -74,6 +93,10 @@ export function NewCandidatePage() {
       const mimeType = file.type || 'application/octet-stream'
       if (mimeType.startsWith('text/') || mimeType === 'application/json') {
         params.cv_text = await file.text()
+      } else if (mimeType.startsWith('image/') && !OPENAI_VISION_TYPES.has(mimeType)) {
+        // Convert unsupported image formats (AVIF, HEIC, etc.) to JPEG
+        params.cv_base64 = await convertImageToJpeg(file)
+        params.cv_media_type = 'image/jpeg'
       } else {
         params.cv_base64 = await fileToBase64(file)
         params.cv_media_type = mimeType
