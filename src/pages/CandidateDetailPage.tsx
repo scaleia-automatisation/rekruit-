@@ -213,8 +213,7 @@ export function CandidateDetailPage() {
       if (token && candidate.email && msgBody) {
         const finalBody = msgBody.replace(/\[TOKEN\]/g, token.token)
         const tokenUrl = `${window.location.origin}/c/${token.token}`
-        // Send email to candidate via Resend with interactive buttons
-        await fetch(`${SUPABASE_URL}/functions/v1/send-interview-invitation`, {
+        const emailRes = await fetch(`${SUPABASE_URL}/functions/v1/send-interview-invitation`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -228,7 +227,13 @@ export function CandidateDetailPage() {
             slots_data: (insertedSlots || []).map(s => ({ id: s.id, label: s.label || s.slot_datetime || '' })),
           }),
         })
-        // Save message log
+        if (!emailRes.ok) {
+          const err = await emailRes.json().catch(() => ({}))
+          console.error('Email send failed:', err)
+          alert(`L'email n'a pas pu être envoyé : ${err.error || emailRes.statusText}`)
+          setScheduleSaving(false)
+          return
+        }
         await supabase.from('messages').insert({
           candidate_id: candidate.id,
           organization_id: (candidate as unknown as { organization_id: string }).organization_id,
@@ -631,9 +636,12 @@ export function CandidateDetailPage() {
               )}
 
               <div className="flex gap-3 pt-2">
-                <Button onClick={saveSchedule} loading={scheduleSaving} disabled={slots.length === 0}>
+                <Button onClick={saveSchedule} loading={scheduleSaving} disabled={slots.length === 0 || !msgBody}>
                   <Send size={15} /> Envoyer l'invitation
                 </Button>
+                {slots.length > 0 && !msgBody && (
+                  <p className="text-xs text-amber-600 self-center">Générez d'abord le message</p>
+                )}
                 <Button variant="secondary" onClick={() => setShowSchedule(false)}>Annuler</Button>
               </div>
             </div>
