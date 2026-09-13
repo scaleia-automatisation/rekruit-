@@ -24,9 +24,9 @@ Les créneaux proposés sont :
 ${slotsText}
 
 IMPORTANT :
-- Liste les créneaux dans le corps de l'email sous forme de liste à puces (avec les dates et heures exactes), AVANT la phrase de clôture type "Dans l'attente de votre retour".
 - Ne mentionne PAS de lien ni d'URL dans le message.
-- Des boutons cliquables de confirmation seront ajoutés automatiquement sous ce texte, il n'est pas nécessaire de le mentionner.
+- Ne liste pas les créneaux dans le texte — des liens cliquables avec les dates seront ajoutés automatiquement juste en dessous du message.
+- Mentionne simplement que des créneaux sont disponibles ci-dessous et qu'il suffit de cliquer.
 - L'email doit être court, chaleureux et professionnel.
 - Signe avec l'équipe RH.`,
 
