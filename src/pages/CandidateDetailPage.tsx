@@ -204,8 +204,8 @@ export function CandidateDetailPage() {
 
     if (interview) {
       const { data: insertedSlots, error: slotsError } = await supabase.from('interview_slots').insert(
-        slots.map(s => ({ interview_id: interview.id, slot_datetime: s.datetime, label: s.label, status: 'pending' }))
-      ).select('id, label, slot_datetime')
+        slots.map(s => ({ interview_id: interview.id, datetime: s.datetime, label: s.label, status: 'pending' }))
+      ).select('id, label, datetime')
 
       if (slotsError) {
         console.error('Slots insert failed:', slotsError)
@@ -219,7 +219,7 @@ export function CandidateDetailPage() {
       if (!slotsForEmail || slotsForEmail.length === 0) {
         const { data: refetched } = await supabase
           .from('interview_slots')
-          .select('id, label, slot_datetime')
+          .select('id, label, datetime')
           .eq('interview_id', interview.id)
         slotsForEmail = refetched
       }
@@ -252,7 +252,7 @@ export function CandidateDetailPage() {
             subject: msgSubject,
             body: finalBody,
             token_url: tokenUrl,
-            slots_data: (slotsForEmail || []).map(s => ({ id: s.id, label: s.label || s.slot_datetime || '' })),
+            slots_data: (slotsForEmail || []).map(s => ({ id: s.id, label: s.label || s.datetime || '' })),
             from_name: candidate.job_offer?.company,
             reply_to: user?.email,
           }),
