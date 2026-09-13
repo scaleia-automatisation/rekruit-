@@ -622,6 +622,7 @@ export function CandidateDetailPage() {
                       onMessageChange={setMsgBody}
                       onGenerate={generateMsg}
                       generating={genMsg}
+                      slots={slots}
                     />
                   ) : (
                     <p className="text-sm text-slate-400">Cliquez sur "Générer" pour créer un message personnalisé</p>
