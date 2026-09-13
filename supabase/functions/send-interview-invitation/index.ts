@@ -32,7 +32,7 @@ Deno.serve(async (req: Request) => {
     const senderName = from_name ? `${from_name} via ${APP_NAME}` : APP_NAME
 
     // Convert plain text / basic markdown to HTML (email-safe)
-    const htmlBody = body
+    let htmlBody = body
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
@@ -41,27 +41,23 @@ Deno.serve(async (req: Request) => {
       .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" style="color:#2563eb">$1</a>')
       .replace(/\n/g, '<br>')
 
-    // Build links section when slots are provided
-    let buttonsSection = ''
+    // Inject slot links + unavailability links directly into the body
     let plainTextSlots = ''
     if (token_url && slots_data && Array.isArray(slots_data) && slots_data.length > 0) {
-      const slotButtons = (slots_data as SlotData[]).map(slot => `
-        <a href="${token_url}?slot=${slot.id}" style="display:block;background:#2563eb;color:#ffffff;text-decoration:none;padding:14px 20px;border-radius:12px;font-weight:600;font-size:14px;margin-bottom:10px;text-align:center">&#128197; ${slot.label}</a>`
+      const slotLinks = (slots_data as SlotData[]).map(slot =>
+        `<a href="${token_url}?slot=${slot.id}" style="display:block;color:#2563eb;font-weight:700;text-decoration:underline;font-size:14px;margin-bottom:10px">&#128197; ${slot.label}</a>`
       ).join('')
 
-      buttonsSection = `
-        <div style="margin-top:28px;border-top:1px solid #e2e8f0;padding-top:24px">
-          <p style="font-weight:700;font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin:0 0 12px 0">Choisissez votre cr&eacute;neau&nbsp;:</p>
-          ${slotButtons}
-          <div style="border-top:1px dashed #e2e8f0;margin:16px 0"></div>
-          <p style="font-size:12px;color:#94a3b8;text-align:center;margin:0 0 10px 0">Ou signalez votre situation&nbsp;:</p>
-          <a href="${token_url}?action=not_available" style="display:block;background:#fffbeb;color:#92400e;text-decoration:none;padding:12px 20px;border-radius:12px;font-weight:600;font-size:13px;margin-bottom:6px;text-align:center;border:1.5px solid #f59e0b">&#128197; Je ne suis pas disponible &agrave; ces dates</a>
-          <p style="font-size:11px;color:#94a3b8;text-align:center;margin:0 0 10px 0">Le recruteur sera inform&eacute; et pourra vous proposer d&apos;autres cr&eacute;neaux</p>
-          <a href="${token_url}?action=not_looking" style="display:block;background:#ffffff;color:#64748b;text-decoration:none;padding:12px 20px;border-radius:12px;font-weight:600;font-size:13px;text-align:center;border:1.5px solid #e2e8f0">&#128277; Je ne recherche plus d&apos;emploi</a>
-          <p style="font-size:11px;color:#94a3b8;text-align:center;margin:4px 0 0 0">Votre candidature sera archiv&eacute;e</p>
+      htmlBody += `
+        <div style="margin-top:20px">
+          <p style="font-weight:700;font-size:13px;color:#1e293b;margin:0 0 12px 0">Cr&eacute;neaux disponibles :</p>
+          ${slotLinks}
+          <br>
+          <a href="${token_url}?action=not_available" style="display:block;color:#2563eb;font-weight:700;text-decoration:underline;font-size:14px;margin-bottom:6px">&#128197; Je ne suis pas disponible &agrave; ces dates</a>
+          <a href="${token_url}?action=not_looking" style="display:block;color:#2563eb;font-weight:700;text-decoration:underline;font-size:14px">&#128277; Je ne recherche plus d&apos;emploi</a>
         </div>`
 
-      plainTextSlots = '\n\nChoisissez votre créneau :\n' +
+      plainTextSlots = '\n\nCréneaux disponibles :\n' +
         (slots_data as SlotData[]).map(s => `- ${s.label} : ${token_url}?slot=${s.id}`).join('\n') +
         `\n\n- Je ne suis pas disponible à ces dates : ${token_url}?action=not_available` +
         `\n- Je ne recherche plus d'emploi : ${token_url}?action=not_looking`
@@ -91,11 +87,8 @@ Deno.serve(async (req: Request) => {
                 <span style="font-weight:700;font-size:18px;color:#0f172a;vertical-align:middle">rekruit</span>
               </div>
 
-              <!-- Body -->
+              <!-- Body + liens créneaux -->
               <div style="color:#1e293b;font-size:14px;line-height:1.7">${htmlBody}</div>
-
-              <!-- Slot buttons -->
-              ${buttonsSection}
 
             </td>
           </tr>

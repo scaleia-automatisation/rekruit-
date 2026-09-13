@@ -121,31 +121,24 @@ export function MessageEditor({
 
               </div>
 
-              {/* Slot buttons + refusal — non-editable, matches exact email output */}
+              {/* Inline slot links — matches exact email output */}
               {slots && slots.length > 0 && (
-                <div className="px-7 pb-7 border-t border-slate-100 pt-5">
-                  <p className="text-xs font-bold text-slate-900 mb-3 uppercase tracking-wide">Choisissez votre créneau :</p>
-                  <div className="space-y-2.5 mb-5">
+                <div className="px-7 pb-7">
+                  <p className="text-xs font-bold text-slate-700 mb-3">Créneaux disponibles :</p>
+                  <div className="space-y-2.5 mb-4">
                     {slots.map((s, i) => (
-                      <div
-                        key={i}
-                        className="bg-blue-600 text-white text-sm font-semibold px-5 py-3.5 rounded-xl text-center select-none"
-                      >
+                      <div key={i} className="text-sm font-bold text-blue-600 underline select-none">
                         📅 {s.label}
                       </div>
                     ))}
                   </div>
-
-                  <div className="border-t border-dashed border-slate-200 pt-4">
-                    <p className="text-xs text-slate-400 mb-3 text-center">Ou signalez votre situation :</p>
-                    <div className="border-2 border-amber-400 text-amber-900 bg-amber-50 px-5 py-3 rounded-xl text-sm font-semibold text-center mb-1 select-none">
-                      🗓 Je ne suis pas disponible à ces dates
+                  <div className="space-y-2">
+                    <div className="text-sm font-bold text-blue-600 underline select-none">
+                      📅 Je ne suis pas disponible à ces dates
                     </div>
-                    <p className="text-xs text-slate-400 text-center mb-4">Le recruteur sera informé et pourra vous proposer d'autres créneaux</p>
-                    <div className="border-2 border-slate-200 text-slate-600 bg-white px-5 py-3 rounded-xl text-sm font-semibold text-center mb-1 select-none">
+                    <div className="text-sm font-bold text-blue-600 underline select-none">
                       🔕 Je ne recherche plus d'emploi
                     </div>
-                    <p className="text-xs text-slate-400 text-center">Votre candidature sera archivée</p>
                   </div>
                 </div>
               )}
