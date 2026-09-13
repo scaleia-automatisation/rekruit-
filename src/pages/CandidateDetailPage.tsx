@@ -203,9 +203,26 @@ export function CandidateDetailPage() {
     }).select().single()
 
     if (interview) {
-      const { data: insertedSlots } = await supabase.from('interview_slots').insert(
+      const { data: insertedSlots, error: slotsError } = await supabase.from('interview_slots').insert(
         slots.map(s => ({ interview_id: interview.id, slot_datetime: s.datetime, label: s.label, status: 'pending' }))
       ).select('id, label, slot_datetime')
+
+      if (slotsError) {
+        console.error('Slots insert failed:', slotsError)
+        alert(`Erreur lors de l'enregistrement des créneaux : ${slotsError.message}`)
+        setScheduleSaving(false)
+        return
+      }
+
+      // Fallback: si insertedSlots est vide, re-requêter par interview_id
+      let slotsForEmail = insertedSlots
+      if (!slotsForEmail || slotsForEmail.length === 0) {
+        const { data: refetched } = await supabase
+          .from('interview_slots')
+          .select('id, label, slot_datetime')
+          .eq('interview_id', interview.id)
+        slotsForEmail = refetched
+      }
 
       const { data: token, error: tokenError } = await supabase.from('interview_tokens').insert({
         interview_id: interview.id,
@@ -235,7 +252,7 @@ export function CandidateDetailPage() {
             subject: msgSubject,
             body: finalBody,
             token_url: tokenUrl,
-            slots_data: (insertedSlots || []).map(s => ({ id: s.id, label: s.label || s.slot_datetime || '' })),
+            slots_data: (slotsForEmail || []).map(s => ({ id: s.id, label: s.label || s.slot_datetime || '' })),
             from_name: candidate.job_offer?.company,
             reply_to: user?.email,
           }),
