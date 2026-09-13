@@ -5,7 +5,7 @@ import { Button } from '../components/ui/Button'
 
 interface SlotData {
   id: string
-  slot_datetime: string | null
+  datetime: string | null
   label: string | null
   status: string | null
 }
@@ -208,7 +208,7 @@ export function PublicInterviewPage() {
                   <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${active ? 'border-blue-600' : 'border-slate-300'}`}>
                     {active && <div className="w-2.5 h-2.5 rounded-full bg-blue-600" />}
                   </div>
-                  {s.label || s.slot_datetime}
+                  {s.label || s.datetime}
                 </div>
               </button>
             )
