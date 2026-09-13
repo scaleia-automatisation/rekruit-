@@ -203,9 +203,23 @@ export function CandidateDetailPage() {
     }).select().single()
 
     if (interview) {
-      const { data: insertedSlots, error: slotsError } = await supabase.from('interview_slots').insert(
-        slots.map(s => ({ interview_id: interview.id, datetime: s.datetime, label: s.label, status: 'pending' }))
-      ).select('id, label, datetime')
+      // Extraire date et time (colonnes NOT NULL dans la table)
+      const slotsPayload = slots.map(s => {
+        const [datePart, timePart] = s.datetime.split('T')
+        return {
+          interview_id: interview.id,
+          datetime: s.datetime,
+          date: datePart,
+          time: (timePart || '00:00') + ':00',
+          label: s.label,
+          status: 'available',
+        }
+      })
+
+      const { data: insertedSlots, error: slotsError } = await supabase
+        .from('interview_slots')
+        .insert(slotsPayload)
+        .select('id, label, datetime')
 
       if (slotsError) {
         console.error('Slots insert failed:', slotsError)
@@ -214,7 +228,7 @@ export function CandidateDetailPage() {
         return
       }
 
-      // Fallback: si insertedSlots est vide, re-requêter par interview_id
+      // Fallback: re-requêter si insertedSlots est vide
       let slotsForEmail = insertedSlots
       if (!slotsForEmail || slotsForEmail.length === 0) {
         const { data: refetched } = await supabase
