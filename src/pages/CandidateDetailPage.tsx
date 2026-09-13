@@ -3,7 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
   ArrowLeft, Mail, Phone, MapPin, Star, CheckCircle, XCircle, CalendarPlus, Trash2,
-  Wand2, Loader2, Send, Upload, Save
+  Wand2, Loader2, Send, Upload, Save, MailCheck
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { generateMessage } from '../lib/ai'
@@ -101,6 +101,7 @@ export function CandidateDetailPage() {
   const [msgBody, setMsgBody] = useState('')
   const [genMsg, setGenMsg] = useState(false)
   const [scheduleSaving, setScheduleSaving] = useState(false)
+  const [emailToast, setEmailToast] = useState<string | null>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -242,6 +243,8 @@ export function CandidateDetailPage() {
           content: finalBody,
           status: 'sent',
         }).then(() => {})
+        setEmailToast(candidate.email)
+        setTimeout(() => setEmailToast(null), 4000)
       }
 
       const { data: ivList } = await supabase.from('interviews').select('*, slots:interview_slots(*)').eq('candidate_id', candidate.id).order('interview_number')
@@ -279,6 +282,16 @@ export function CandidateDetailPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
+      {/* Email sent toast */}
+      {emailToast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-green-600 text-white px-5 py-3.5 rounded-2xl shadow-lg animate-in fade-in slide-in-from-top-2 duration-300">
+          <MailCheck size={18} />
+          <div>
+            <p className="font-semibold text-sm">Email envoyé !</p>
+            <p className="text-xs text-green-100">Invitation envoyée à {emailToast}</p>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between mb-6">
         <Link to="/candidats" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-800">
           <ArrowLeft size={16} /> Retour
