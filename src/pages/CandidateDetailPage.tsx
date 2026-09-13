@@ -203,18 +203,12 @@ export function CandidateDetailPage() {
     }).select().single()
 
     if (interview) {
-      // Extraire date et time (colonnes NOT NULL dans la table)
-      const slotsPayload = slots.map(s => {
-        const [datePart, timePart] = s.datetime.split('T')
-        return {
-          interview_id: interview.id,
-          datetime: s.datetime,
-          date: datePart,
-          time: (timePart || '00:00') + ':00',
-          label: s.label,
-          status: 'available',
-        }
-      })
+      const slotsPayload = slots.map(s => ({
+        interview_id: interview.id,
+        datetime: s.datetime,
+        label: s.label,
+        status: 'available',
+      }))
 
       const { data: insertedSlots, error: slotsError } = await supabase
         .from('interview_slots')
