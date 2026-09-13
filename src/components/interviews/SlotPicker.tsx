@@ -15,7 +15,7 @@ interface SlotPickerProps {
 function formatLabel(dt: string) {
   if (!dt) return ''
   const d = new Date(dt)
-  return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) +
+  return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) +
     ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 }
 
