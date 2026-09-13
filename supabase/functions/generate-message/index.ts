@@ -20,9 +20,15 @@ Deno.serve(async (req: Request) => {
     const prompts: Record<string, string> = {
       interview_invitation: `Rédige un email professionnel et chaleureux pour inviter ${candidate?.first_name} ${candidate?.last_name} à un entretien pour le poste de ${job_offer?.title} chez ${job_offer?.company}.
 
-Les créneaux proposés sont : ${slotsText}
+Les créneaux proposés sont :
+${slotsText}
 
-IMPORTANT : Ne mentionne PAS de lien ni d'URL dans le message. Ne liste pas les créneaux dans le texte. Termine simplement le corps de l'email en indiquant que les boutons de choix de créneau sont disponibles juste en dessous (ils seront ajoutés automatiquement à la suite de ce message). L'email doit être court, chaleureux et professionnel. Signe avec l'équipe RH.`,
+IMPORTANT :
+- Liste les créneaux dans le corps de l'email sous forme de liste à puces (avec les dates et heures exactes), AVANT la phrase de clôture type "Dans l'attente de votre retour".
+- Ne mentionne PAS de lien ni d'URL dans le message.
+- Des boutons cliquables de confirmation seront ajoutés automatiquement sous ce texte, il n'est pas nécessaire de le mentionner.
+- L'email doit être court, chaleureux et professionnel.
+- Signe avec l'équipe RH.`,
 
       shortlist: `Rédige un email pour informer ${candidate?.first_name} ${candidate?.last_name} que sa candidature pour le poste de ${job_offer?.title} chez ${job_offer?.company} a été présélectionnée. Message court et encourageant.`,
 
