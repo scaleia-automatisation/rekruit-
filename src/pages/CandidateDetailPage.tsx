@@ -101,6 +101,7 @@ export function CandidateDetailPage() {
   const [msgBody, setMsgBody] = useState('')
   const [genMsg, setGenMsg] = useState(false)
   const [scheduleSaving, setScheduleSaving] = useState(false)
+  const [scheduleSuccess, setScheduleSuccess] = useState(false)
   const [emailToast, setEmailToast] = useState<string | null>(null)
 
   useEffect(() => {
@@ -163,6 +164,7 @@ export function CandidateDetailPage() {
     setSlots([])
     setMsgSubject('')
     setMsgBody('')
+    setScheduleSuccess(false)
     setShowSchedule(true)
   }
 
@@ -262,7 +264,11 @@ export function CandidateDetailPage() {
       setInterviews((ivList || []) as Interview[])
     }
     setScheduleSaving(false)
-    setShowSchedule(false)
+    setScheduleSuccess(true)
+    setTimeout(() => {
+      setScheduleSuccess(false)
+      setShowSchedule(false)
+    }, 3500)
   }
 
   if (loading) {
@@ -659,15 +665,36 @@ export function CandidateDetailPage() {
                 </div>
               )}
 
-              <div className="flex gap-3 pt-2">
-                <Button onClick={saveSchedule} loading={scheduleSaving} disabled={slots.length === 0 || !msgBody}>
-                  <Send size={15} /> Envoyer l'invitation
-                </Button>
-                {slots.length > 0 && !msgBody && (
-                  <p className="text-xs text-amber-600 self-center">Générez d'abord le message</p>
-                )}
-                <Button variant="secondary" onClick={() => setShowSchedule(false)}>Annuler</Button>
-              </div>
+              {scheduleSuccess ? (
+                <div className="mt-4 rounded-2xl border border-green-200 bg-green-50 px-6 py-6 text-center">
+                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <MailCheck size={24} className="text-green-600" />
+                  </div>
+                  <p className="font-semibold text-green-900 mb-1">Invitation envoyée !</p>
+                  <p className="text-sm text-green-700">
+                    L'email a bien été envoyé à <strong>{candidate.email}</strong>.<br />
+                    Le candidat peut maintenant choisir son créneau.
+                  </p>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="mt-4"
+                    onClick={() => { setScheduleSuccess(false); setShowSchedule(false) }}
+                  >
+                    Fermer
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex gap-3 pt-2">
+                  <Button onClick={saveSchedule} loading={scheduleSaving} disabled={slots.length === 0 || !msgBody}>
+                    <Send size={15} /> Envoyer l'invitation
+                  </Button>
+                  {slots.length > 0 && !msgBody && (
+                    <p className="text-xs text-amber-600 self-center">Générez d'abord le message</p>
+                  )}
+                  <Button variant="secondary" onClick={() => setShowSchedule(false)}>Annuler</Button>
+                </div>
+              )}
             </div>
           </div>
         </div>
