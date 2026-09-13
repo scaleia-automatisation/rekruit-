@@ -189,26 +189,35 @@ export function CandidateDetailPage() {
   const saveSchedule = async () => {
     if (!candidate || slots.length === 0) return
     setScheduleSaving(true)
+    // Use the logged-in user's org, not candidate.organization_id (may differ due to data issues)
+    const orgId = profile?.organization_id
+    if (!orgId) { setScheduleSaving(false); return }
+
     const { data: interview } = await supabase.from('interviews').insert({
       candidate_id: candidate.id,
       job_offer_id: candidate.job_offer_id,
-      organization_id: (candidate as unknown as { organization_id: string }).organization_id,
+      organization_id: orgId,
       interview_number: scheduleFor,
       status: 'pending',
     }).select().single()
 
     if (interview) {
-      const orgId = (candidate as unknown as { organization_id: string }).organization_id
       const { data: insertedSlots } = await supabase.from('interview_slots').insert(
         slots.map(s => ({ interview_id: interview.id, slot_datetime: s.datetime, label: s.label, status: 'pending' }))
       ).select('id, label, slot_datetime')
 
-      const { data: token } = await supabase.from('interview_tokens').insert({
+      const { data: token, error: tokenError } = await supabase.from('interview_tokens').insert({
         interview_id: interview.id,
         candidate_id: candidate.id,
         organization_id: orgId,
         status: 'pending',
       }).select().single()
+      if (tokenError) {
+        console.error('Token insert failed:', tokenError)
+        alert(`Erreur lors de la création du lien candidat : ${tokenError.message}`)
+        setScheduleSaving(false)
+        return
+      }
 
       await updateStatus(`interview_${scheduleFor}` as CandidateStatus)
       if (token && candidate.email && msgBody) {
