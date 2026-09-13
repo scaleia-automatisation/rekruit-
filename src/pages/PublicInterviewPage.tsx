@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { CheckCircle, Loader2, CalendarX, Briefcase } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 
@@ -28,6 +28,7 @@ type Selection =
 
 export function PublicInterviewPage() {
   const { token } = useParams<{ token: string }>()
+  const [searchParams] = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [tokenData, setTokenData] = useState<TokenData | null>(null)
   const [slots, setSlots] = useState<SlotData[]>([])
@@ -35,6 +36,7 @@ export function PublicInterviewPage() {
   const [selection, setSelection] = useState<Selection | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [doneResult, setDoneResult] = useState<'slot_confirmed' | 'not_available' | 'not_looking' | null>(null)
+  const autoSubmitted = useRef(false)
 
   useEffect(() => {
     const load = async () => {
@@ -53,15 +55,30 @@ export function PublicInterviewPage() {
     load()
   }, [token])
 
-  const submit = async () => {
-    if (!selection || !token) return
+  // Auto-submit when coming from email button click
+  useEffect(() => {
+    if (!tokenData || tokenData.status !== 'pending' || autoSubmitted.current) return
+
+    const slotParam = searchParams.get('slot')
+    const actionParam = searchParams.get('action')
+
+    if (slotParam) {
+      const slotExists = slots.some(s => s.id === slotParam)
+      if (slotExists) {
+        autoSubmitted.current = true
+        submitPayload({ slot_id: slotParam })
+      }
+    } else if (actionParam === 'not_available' || actionParam === 'not_looking') {
+      autoSubmitted.current = true
+      submitPayload({ action: actionParam })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tokenData, slots])
+
+  const submitPayload = async (payload: Record<string, string>) => {
+    if (!token) return
     setSubmitting(true)
     try {
-      const payload =
-        selection.kind === 'slot'
-          ? { slot_id: selection.id }
-          : { action: selection.kind }
-
       const res = await fetch(`${SUPABASE_URL}/functions/v1/public-interview?token=${token}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -76,10 +93,19 @@ export function PublicInterviewPage() {
     setSubmitting(false)
   }
 
-  if (loading) {
+  const submit = () => {
+    if (!selection) return
+    if (selection.kind === 'slot') submitPayload({ slot_id: selection.id })
+    else submitPayload({ action: selection.kind })
+  }
+
+  if (loading || (submitting && !doneResult)) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Loader2 size={32} className="animate-spin text-blue-600" />
+        <div className="text-center">
+          <Loader2 size={32} className="animate-spin text-blue-600 mx-auto mb-3" />
+          {submitting && <p className="text-slate-500 text-sm">Enregistrement en cours...</p>}
+        </div>
       </div>
     )
   }
@@ -242,7 +268,7 @@ export function PublicInterviewPage() {
           loading={submitting}
           disabled={!selection}
           className="w-full justify-center"
-          variant={isNotLooking ? 'secondary' : isNotAvailable ? 'secondary' : 'primary'}
+          variant={isNotLooking || isNotAvailable ? 'secondary' : 'primary'}
         >
           {isNotAvailable
             ? 'Signaler mon indisponibilité'

@@ -197,18 +197,23 @@ export function CandidateDetailPage() {
     }).select().single()
 
     if (interview) {
-      await supabase.from('interview_slots').insert(
+      const orgId = (candidate as unknown as { organization_id: string }).organization_id
+      const { data: insertedSlots } = await supabase.from('interview_slots').insert(
         slots.map(s => ({ interview_id: interview.id, slot_datetime: s.datetime, label: s.label, status: 'pending' }))
-      )
+      ).select('id, label, slot_datetime')
+
       const { data: token } = await supabase.from('interview_tokens').insert({
         interview_id: interview.id,
+        candidate_id: candidate.id,
+        organization_id: orgId,
         status: 'pending',
       }).select().single()
 
       await updateStatus(`interview_${scheduleFor}` as CandidateStatus)
       if (token && candidate.email && msgBody) {
         const finalBody = msgBody.replace(/\[TOKEN\]/g, token.token)
-        // Send email to candidate via Resend
+        const tokenUrl = `${window.location.origin}/c/${token.token}`
+        // Send email to candidate via Resend with interactive buttons
         await fetch(`${SUPABASE_URL}/functions/v1/send-interview-invitation`, {
           method: 'POST',
           headers: {
@@ -219,6 +224,8 @@ export function CandidateDetailPage() {
             to: candidate.email,
             subject: msgSubject,
             body: finalBody,
+            token_url: tokenUrl,
+            slots_data: (insertedSlots || []).map(s => ({ id: s.id, label: s.label || s.slot_datetime || '' })),
           }),
         })
         // Save message log
