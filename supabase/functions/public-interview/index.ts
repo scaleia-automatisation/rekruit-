@@ -7,7 +7,7 @@ const corsHeaders = {
 }
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') || ''
-const FROM_EMAIL = 'noreply@rekruit.net'
+const FROM_EMAIL = 'bonjour@rekruit.net'
 
 async function sendEmail(to: string, subject: string, html: string) {
   if (!to || !RESEND_API_KEY) return
@@ -22,17 +22,17 @@ function notifHtml(title: string, body: string) {
   return `
     <div style="font-family:Inter,sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;background:#f8fafc">
       <div style="background:#fff;border-radius:16px;padding:32px;border:1px solid #e2e8f0">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:28px">
-          <div style="width:32px;height:32px;background:#2563eb;border-radius:8px;display:flex;align-items:center;justify-content:center">
+        <div style="margin-bottom:28px">
+          <span style="display:inline-block;width:32px;height:32px;background:#2563eb;border-radius:8px;text-align:center;line-height:32px;vertical-align:middle;margin-right:10px">
             <span style="color:#fff;font-weight:700;font-size:14px">R</span>
-          </div>
-          <span style="font-weight:700;font-size:18px;color:#0f172a">rekruit</span>
+          </span>
+          <span style="font-weight:700;font-size:18px;color:#0f172a;vertical-align:middle">rekruit</span>
         </div>
         <h2 style="font-size:18px;font-weight:700;color:#0f172a;margin:0 0 16px">${title}</h2>
         <div style="color:#1e293b;font-size:14px;line-height:1.7">${body}</div>
       </div>
       <p style="text-align:center;color:#94a3b8;font-size:12px;margin-top:16px">
-        Envoyé via <a href="https://rekruit.net" style="color:#94a3b8">rekruit.net</a>
+        Envoy&eacute; via <a href="https://rekruit.net" style="color:#94a3b8">rekruit.net</a>
       </p>
     </div>`
 }
@@ -84,7 +84,7 @@ Deno.serve(async (req: Request) => {
         .from('interview_slots')
         .select('*')
         .eq('interview_id', tokenData.interview_id)
-        .order('slot_datetime')
+        .order('datetime')
 
       return new Response(JSON.stringify({ token: tokenData, slots }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -95,7 +95,6 @@ Deno.serve(async (req: Request) => {
       const body = await req.json()
       const { slot_id, action } = body
 
-      // Load token with full context
       const { data: tokenData } = await supabase
         .from('interview_tokens')
         .select(`
@@ -117,7 +116,6 @@ Deno.serve(async (req: Request) => {
         })
       }
 
-      // Get organization email for notification
       const { data: org } = await supabase
         .from('organizations')
         .select('email, name')
@@ -129,7 +127,6 @@ Deno.serve(async (req: Request) => {
       const jobOffer = iv?.job_offer
       const candidateName = candidate ? `${candidate.first_name} ${candidate.last_name}` : 'Le candidat'
 
-      // ── Slot confirmation ──────────────────────────────────────────────
       if (slot_id) {
         await supabase
           .from('interview_tokens')
@@ -146,14 +143,13 @@ Deno.serve(async (req: Request) => {
           .update({ status: 'scheduled' })
           .eq('id', tokenData.interview_id)
 
-        // Get slot label for notification
         const { data: slot } = await supabase
           .from('interview_slots')
-          .select('label, slot_datetime')
+          .select('label, datetime')
           .eq('id', slot_id)
           .single()
 
-        const slotLabel = slot?.label || slot?.slot_datetime || 'créneau sélectionné'
+        const slotLabel = slot?.label || slot?.datetime || 'créneau sélectionné'
 
         if (org?.email) {
           await sendEmail(
@@ -163,7 +159,7 @@ Deno.serve(async (req: Request) => {
               `Créneau confirmé — Entretien ${iv?.interview_number}`,
               `<p><strong>${candidateName}</strong> a choisi un créneau pour le poste <strong>${jobOffer?.title}</strong>${jobOffer?.company ? ` chez ${jobOffer.company}` : ''} :</p>
                <p style="background:#f0fdf4;border-left:4px solid #22c55e;padding:12px 16px;border-radius:0 8px 8px 0;font-weight:600;color:#15803d">${slotLabel}</p>
-               <p>Connectez-vous à rekruit pour confirmer les détails de l'entretien.</p>`
+               <p>Connectez-vous &agrave; rekruit pour confirmer les d&eacute;tails de l&apos;entretien.</p>`
             )
           )
         }
@@ -173,7 +169,6 @@ Deno.serve(async (req: Request) => {
         })
       }
 
-      // ── Not available / Not looking ────────────────────────────────────
       if (action === 'not_available' || action === 'not_looking') {
         const candidateStatus = action === 'not_available' ? 'unavailable' : 'not_looking'
 
@@ -208,9 +203,9 @@ Deno.serve(async (req: Request) => {
             subjectLine,
             notifHtml(
               `${actionEmoji} Réponse du candidat — Entretien ${iv?.interview_number}`,
-              `<p><strong>${candidateName}</strong> a répondu à l'invitation d'entretien pour le poste <strong>${jobOffer?.title}</strong>${jobOffer?.company ? ` chez ${jobOffer.company}` : ''} :</p>
+              `<p><strong>${candidateName}</strong> a r&eacute;pondu &agrave; l&apos;invitation d&apos;entretien pour le poste <strong>${jobOffer?.title}</strong>${jobOffer?.company ? ` chez ${jobOffer.company}` : ''} :</p>
                <p style="background:${badgeBg};border-left:4px solid ${badgeBorder};padding:12px 16px;border-radius:0 8px 8px 0;font-weight:600;color:${badgeColor}">${candidateName} ${actionLabel}</p>
-               <p>Son profil a été mis à jour dans votre pipeline rekruit. Connectez-vous pour consulter votre tableau de bord.</p>`
+               <p>Son profil a &eacute;t&eacute; mis &agrave; jour dans votre pipeline rekruit. Connectez-vous pour consulter votre tableau de bord.</p>`
             )
           )
         }
