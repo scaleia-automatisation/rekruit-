@@ -197,7 +197,6 @@ export function CandidateDetailPage() {
 
     const { data: interview } = await supabase.from('interviews').insert({
       candidate_id: candidate.id,
-      job_offer_id: candidate.job_offer_id,
       organization_id: orgId,
       interview_number: scheduleFor,
       status: 'pending',
