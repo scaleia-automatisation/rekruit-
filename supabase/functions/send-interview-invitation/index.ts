@@ -41,41 +41,26 @@ Deno.serve(async (req: Request) => {
       .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" style="color:#2563eb">$1</a>')
       .replace(/\n/g, '<br>')
 
-    // Build interactive buttons section when slots are provided
+    // Build links section when slots are provided
     let buttonsSection = ''
     let plainTextSlots = ''
     if (token_url && slots_data && Array.isArray(slots_data) && slots_data.length > 0) {
-      const slotButtons = (slots_data as SlotData[]).map(slot => `
-        <a href="${token_url}?slot=${slot.id}"
-           style="display:block;background:#2563eb;color:#ffffff;text-decoration:none;padding:14px 20px;border-radius:12px;font-weight:600;font-size:14px;margin-bottom:10px;text-align:center;mso-padding-alt:14px 20px">
-          &#128197; ${slot.label}
-        </a>`).join('')
+      const slotLinks = (slots_data as SlotData[]).map(slot =>
+        `<p style="margin:0 0 8px 0;font-size:14px">&#128197; <a href="${token_url}?slot=${slot.id}" style="color:#2563eb;text-decoration:underline">${slot.label}</a></p>`
+      ).join('')
 
       buttonsSection = `
         <div style="margin-top:28px;border-top:1px solid #e2e8f0;padding-top:24px">
-          <p style="font-weight:700;font-size:14px;color:#0f172a;margin:0 0 14px 0">Choisissez votre cr&eacute;neau&nbsp;:</p>
-          ${slotButtons}
-
-          <div style="border-top:1px dashed #e2e8f0;margin:20px 0 16px 0"></div>
-          <p style="font-size:12px;color:#94a3b8;margin:0 0 12px 0;text-align:center">Ou signalez votre situation&nbsp;:</p>
-
-          <a href="${token_url}?action=not_available"
-             style="display:block;background:#fffbeb;color:#92400e;text-decoration:none;padding:12px 20px;border-radius:12px;font-weight:600;font-size:13px;margin-bottom:8px;text-align:center;border:1.5px solid #f59e0b">
-            &#128197; Je ne suis pas disponible &agrave; ces dates
-          </a>
-          <p style="font-size:11px;color:#94a3b8;text-align:center;margin:0 0 16px 0">Le recruteur sera inform&eacute; et pourra vous proposer d&apos;autres cr&eacute;neaux</p>
-
-          <a href="${token_url}?action=not_looking"
-             style="display:block;background:#ffffff;color:#64748b;text-decoration:none;padding:12px 20px;border-radius:12px;font-weight:600;font-size:13px;text-align:center;border:1.5px solid #e2e8f0">
-            &#128277; Je ne recherche plus d&apos;emploi
-          </a>
-          <p style="font-size:11px;color:#94a3b8;text-align:center;margin:4px 0 0 0">Votre candidature sera archiv&eacute;e</p>
+          <p style="font-weight:700;font-size:14px;color:#0f172a;margin:0 0 12px 0">Choisissez votre cr&eacute;neau&nbsp;:</p>
+          ${slotLinks}
+          <p style="margin:20px 0 8px 0;font-size:14px">&#128197; <a href="${token_url}?action=not_available" style="color:#f59e0b;text-decoration:underline">Je ne suis pas disponible &agrave; ces dates</a></p>
+          <p style="margin:0 0 8px 0;font-size:14px">&#128277; <a href="${token_url}?action=not_looking" style="color:#64748b;text-decoration:underline">Je ne recherche plus d&apos;emploi</a></p>
         </div>`
 
       plainTextSlots = '\n\nChoisissez votre créneau :\n' +
         (slots_data as SlotData[]).map(s => `- ${s.label} : ${token_url}?slot=${s.id}`).join('\n') +
-        `\n\nJe ne suis pas disponible à ces dates : ${token_url}?action=not_available` +
-        `\nJe ne recherche plus d'emploi : ${token_url}?action=not_looking`
+        `\n\n- Je ne suis pas disponible à ces dates : ${token_url}?action=not_available` +
+        `\n- Je ne recherche plus d'emploi : ${token_url}?action=not_looking`
     }
 
     // Email-client-safe HTML (no flexbox — use inline-block instead)
