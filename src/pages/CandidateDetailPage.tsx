@@ -91,7 +91,7 @@ export function CandidateDetailPage() {
   const [coverLetter, setCoverLetter] = useState('')
   const [savingCover, setSavingCover] = useState(false)
   const [cvUploading, setCvUploading] = useState(false)
-  const { profile } = useAuth()
+  const { profile, user } = useAuth()
 
   // Interview scheduling state
   const [showSchedule, setShowSchedule] = useState(false)
@@ -226,6 +226,8 @@ export function CandidateDetailPage() {
             body: finalBody,
             token_url: tokenUrl,
             slots_data: (insertedSlots || []).map(s => ({ id: s.id, label: s.label || s.slot_datetime || '' })),
+            from_name: candidate.job_offer?.company,
+            reply_to: user?.email,
           }),
         })
         if (!emailRes.ok) {

@@ -20,13 +20,16 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { to, subject, body, token_url, slots_data } = await req.json()
+    const { to, subject, body, token_url, slots_data, from_name, reply_to } = await req.json()
 
     if (!to || !subject || !body) {
       return new Response(JSON.stringify({ error: 'Paramètres manquants: to, subject, body requis' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
+
+    // "Acme Corp via rekruit" or fallback to "rekruit"
+    const senderName = from_name ? `${from_name} via ${APP_NAME}` : APP_NAME
 
     // Convert plain text / basic markdown to HTML
     const htmlBody = body
@@ -89,7 +92,13 @@ Deno.serve(async (req: Request) => {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${RESEND_API_KEY}` },
-      body: JSON.stringify({ from: `${APP_NAME} <${FROM_EMAIL}>`, to: [to], subject, html }),
+      body: JSON.stringify({
+        from: `${senderName} <${FROM_EMAIL}>`,
+        to: [to],
+        subject,
+        html,
+        ...(reply_to ? { reply_to } : {}),
+      }),
     })
 
     if (!res.ok) {
