@@ -223,7 +223,7 @@ export function CandidateDetailPage() {
         return
       }
 
-      const slotsForEmail = slotsWithIds.map(s => ({ id: s.id, label: s.label }))
+            const slotsForEmail = slotsWithIds.map(s => ({ id: s.id, label: s.label, datetime: s.datetime }))
 
       const { data: token, error: tokenError } = await supabase.from('interview_tokens').insert({
         interview_id: interview.id,
