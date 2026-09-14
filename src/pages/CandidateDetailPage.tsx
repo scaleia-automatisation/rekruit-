@@ -55,7 +55,16 @@ interface Interview {
   score: number | null
   ai_summary: string | null
   recommendation: string | null
-    slots?: { id: string; datetime: string | null; label: string | null; status: string | null }[]
+    interface Interview {
+  id: string
+  interview_number: number
+  status: string
+  scheduled_at: string | null
+  score: number | null
+  ai_summary: string | null
+  recommendation: string | null
+  slots?: { id: string; datetime: string | null; label: string | null; status: string | null }[]
+}
 
 const statusConfig: Record<string, { label: string; variant: 'blue' | 'green' | 'orange' | 'red' | 'gray' | 'purple' }> = {
   new: { label: 'Nouveau', variant: 'gray' },
