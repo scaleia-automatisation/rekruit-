@@ -55,14 +55,6 @@ interface Interview {
   score: number | null
   ai_summary: string | null
   recommendation: string | null
-    interface Interview {
-  id: string
-  interview_number: number
-  status: string
-  scheduled_at: string | null
-  score: number | null
-  ai_summary: string | null
-  recommendation: string | null
   slots?: { id: string; datetime: string | null; label: string | null; status: string | null }[]
 }
 
@@ -261,7 +253,7 @@ export function CandidateDetailPage() {
             subject: msgSubject,
             body: finalBody,
             token_url: tokenUrl,
-             slots_data: (slotsForEmail || []).map(s => ({ id: s.id, label: s.label })),
+            slots_data: (slotsForEmail || []).map(s => ({ id: s.id, label: s.label })),
             from_name: candidate.job_offer?.company,
             reply_to: user?.email,
           }),
@@ -581,7 +573,7 @@ export function CandidateDetailPage() {
                   <div className="space-y-2 mb-3">
                     {iv.slots.map(s => (
                       <div key={s.id} className={`text-sm px-3 py-2 rounded-lg ${s.status === 'confirmed' ? 'bg-green-50 text-green-700 font-medium' : 'bg-slate-50 text-slate-600'}`}>
-                                                                       {s.label || (s.datetime ? new Date(s.datetime).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')} ? new Date(s.datetime).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')}, day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')}
+                        {s.label || (s.datetime ? new Date(s.datetime).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '')}
                         {s.status === 'confirmed' && ' ✓'}
                       </div>
                     ))}
