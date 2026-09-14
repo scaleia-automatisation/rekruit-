@@ -116,12 +116,14 @@ export function MessageEditor({
                         <span key={i}>
                           <span className="whitespace-pre-wrap">{part}</span>
                           {i === 0 && (
-                            <span className="block my-3 space-y-2">
+                            <span className="block my-5">
+                              <span className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-3">Choisissez votre créneau :</span>
                               {slots.map((s, j) => (
-                                <span key={j} className="block font-bold text-blue-600 underline">📅 {s.label}</span>
+                                <span key={j} className="block bg-blue-600 text-white font-semibold text-sm text-center py-3.5 px-5 rounded-xl mb-2">📅 {s.label}</span>
                               ))}
-                              <span className="block font-bold text-blue-600 underline">📅 Je ne suis pas disponible à ces dates</span>
-                              <span className="block font-bold text-blue-600 underline">🔕 Je ne recherche plus d'emploi</span>
+                              <span className="block text-xs text-slate-400 text-center my-3">Ou signalez votre situation :</span>
+                              <span className="block bg-white text-amber-700 font-semibold text-sm text-center py-3.5 px-5 rounded-xl mb-2 border-2 border-amber-400">📅 Je ne suis pas disponible à ces dates</span>
+                              <span className="block bg-slate-50 text-slate-500 font-medium text-sm text-center py-3.5 px-5 rounded-xl border border-slate-200">🔕 Je ne recherche plus d'emploi</span>
                             </span>
                           )}
                         </span>
