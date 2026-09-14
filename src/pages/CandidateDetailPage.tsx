@@ -203,17 +203,18 @@ export function CandidateDetailPage() {
     }).select().single()
 
     if (interview) {
-      const slotsPayload = slots.map(s => ({
+      // Pre-generate UUIDs so we know the IDs before the insert returns
+      const slotsWithIds = slots.map(s => ({
+        id: crypto.randomUUID(),
         interview_id: interview.id,
         datetime: s.datetime,
         label: s.label,
         status: 'available',
       }))
 
-      const { data: insertedSlots, error: slotsError } = await supabase
+      const { error: slotsError } = await supabase
         .from('interview_slots')
-        .insert(slotsPayload)
-        .select('id, label, datetime')
+        .insert(slotsWithIds)
 
       if (slotsError) {
         console.error('Slots insert failed:', slotsError)
@@ -222,15 +223,7 @@ export function CandidateDetailPage() {
         return
       }
 
-      // Fallback: re-requêter si insertedSlots est vide
-      let slotsForEmail = insertedSlots
-      if (!slotsForEmail || slotsForEmail.length === 0) {
-        const { data: refetched } = await supabase
-          .from('interview_slots')
-          .select('id, label, datetime')
-          .eq('interview_id', interview.id)
-        slotsForEmail = refetched
-      }
+      const slotsForEmail = slotsWithIds.map(s => ({ id: s.id, label: s.label }))
 
       const { data: token, error: tokenError } = await supabase.from('interview_tokens').insert({
         interview_id: interview.id,
