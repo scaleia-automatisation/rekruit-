@@ -116,9 +116,32 @@ Deno.serve(async (req: Request) => {
         })
       }
 
+      // Resolve recruiter email: use stored recruiter_email, fallback to users table
+      let recruiterEmail: string | null = tokenData.recruiter_email || null
+      let recruiterUserId: string | null = null
+
+      if (!recruiterEmail) {
+        const { data: recruiterUser } = await supabase
+          .from('users')
+          .select('id, email')
+          .eq('organization_id', tokenData.organization_id)
+          .limit(1)
+          .single()
+        recruiterEmail = recruiterUser?.email || null
+        recruiterUserId = recruiterUser?.id || null
+      } else {
+        const { data: recruiterUser } = await supabase
+          .from('users')
+          .select('id')
+          .eq('email', recruiterEmail)
+          .limit(1)
+          .single()
+        recruiterUserId = recruiterUser?.id || null
+      }
+
       const { data: org } = await supabase
         .from('organizations')
-        .select('email, name')
+        .select('name')
         .eq('id', tokenData.organization_id)
         .single()
 
@@ -151,9 +174,20 @@ Deno.serve(async (req: Request) => {
 
         const slotLabel = slot?.label || slot?.datetime || 'créneau sélectionné'
 
-        if (org?.email) {
+        const notifTitle = `✅ ${candidateName} a confirmé un créneau`
+        const notifContent = `${candidateName} a choisi le créneau "${slotLabel}" pour le poste ${jobOffer?.title}${jobOffer?.company ? ` chez ${jobOffer.company}` : ''}.`
+
+        await supabase.from('notifications').insert({
+          organization_id: tokenData.organization_id,
+          user_id: recruiterUserId,
+          type: 'interview_confirmed',
+          title: notifTitle,
+          content: notifContent,
+        })
+
+        if (recruiterEmail) {
           await sendEmail(
-            org.email,
+            recruiterEmail,
             `✅ ${candidateName} a confirmé un créneau d'entretien`,
             notifHtml(
               `Créneau confirmé — Entretien ${iv?.interview_number}`,
@@ -197,9 +231,20 @@ Deno.serve(async (req: Request) => {
         const badgeBg = action === 'not_available' ? '#fffbeb' : '#fef2f2'
         const badgeBorder = action === 'not_available' ? '#f59e0b' : '#ef4444'
 
-        if (org?.email) {
+        const notifTitle = `${actionEmoji} ${candidateName} ${actionLabel}`
+        const notifContent = `${candidateName} a répondu à l'invitation pour le poste ${jobOffer?.title}${jobOffer?.company ? ` chez ${jobOffer.company}` : ''} : ${actionLabel}.`
+
+        await supabase.from('notifications').insert({
+          organization_id: tokenData.organization_id,
+          user_id: recruiterUserId,
+          type: action === 'not_available' ? 'candidate_unavailable' : 'candidate_not_looking',
+          title: notifTitle,
+          content: notifContent,
+        })
+
+        if (recruiterEmail) {
           await sendEmail(
-            org.email,
+            recruiterEmail,
             subjectLine,
             notifHtml(
               `${actionEmoji} Réponse du candidat — Entretien ${iv?.interview_number}`,
