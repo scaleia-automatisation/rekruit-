@@ -41,14 +41,20 @@ Deno.serve(async (req: Request) => {
       .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" style="color:#2563eb">$1</a>')
       .replace(/\n/g, '<br>')
 
-    // Build inline links block and replace [CRÉNEAUX] placeholder, or append at end
+    // Build styled button block and replace [CRÉNEAUX] placeholder, or append at end
     let plainTextSlots = ''
     if (token_url && slots_data && Array.isArray(slots_data) && slots_data.length > 0) {
-      const slotLinks = (slots_data as SlotData[]).map(slot =>
-        `<a href="${token_url}?slot=${slot.id}" style="display:block;color:#2563eb;font-weight:700;text-decoration:underline;font-size:14px;margin-bottom:10px">&#128197; ${slot.label}</a>`
+      const slotButtons = (slots_data as SlotData[]).map(slot =>
+        `<a href="${token_url}?slot=${slot.id}" style="display:block;background:#2563eb;color:#ffffff;font-weight:600;font-size:14px;text-align:center;text-decoration:none;padding:14px 20px;border-radius:12px;margin-bottom:8px">&#128197; ${slot.label}</a>`
       ).join('')
 
-      const linksBlock = `<div style="margin:16px 0">${slotLinks}<a href="${token_url}?action=not_available" style="display:block;color:#2563eb;font-weight:700;text-decoration:underline;font-size:14px;margin-bottom:6px;margin-top:6px">&#128197; Je ne suis pas disponible &agrave; ces dates</a><a href="${token_url}?action=not_looking" style="display:block;color:#2563eb;font-weight:700;text-decoration:underline;font-size:14px">&#128277; Je ne recherche plus d&apos;emploi</a></div>`
+      const linksBlock = `<div style="margin:24px 0">
+<p style="font-size:11px;font-weight:700;color:#64748b;letter-spacing:0.05em;text-transform:uppercase;margin:0 0 12px 0">Choisissez votre cr&eacute;neau&nbsp;:</p>
+${slotButtons}
+<p style="font-size:12px;color:#94a3b8;text-align:center;margin:16px 0 12px 0">Ou signalez votre situation&nbsp;:</p>
+<a href="${token_url}?action=not_available" style="display:block;background:#ffffff;color:#b45309;font-weight:600;font-size:14px;text-align:center;text-decoration:none;padding:14px 20px;border-radius:12px;margin-bottom:8px;border:2px solid #fbbf24">&#128197; Je ne suis pas disponible &agrave; ces dates</a>
+<a href="${token_url}?action=not_looking" style="display:block;background:#f8fafc;color:#64748b;font-weight:500;font-size:14px;text-align:center;text-decoration:none;padding:14px 20px;border-radius:12px;border:1px solid #e2e8f0">&#128277; Je ne recherche plus d&apos;emploi</a>
+</div>`
 
       if (body.includes('[CRÉNEAUX]')) {
         htmlBody = htmlBody.replace('[CRÉNEAUX]', linksBlock)
@@ -56,9 +62,10 @@ Deno.serve(async (req: Request) => {
         htmlBody += linksBlock
       }
 
-      plainTextSlots = '\n\nCréneaux disponibles :\n' +
+      plainTextSlots = '\n\nChoisissez votre créneau :\n' +
         (slots_data as SlotData[]).map(s => `- ${s.label} : ${token_url}?slot=${s.id}`).join('\n') +
-        `\n\n- Je ne suis pas disponible à ces dates : ${token_url}?action=not_available` +
+        `\n\nOu signalez votre situation :` +
+        `\n- Je ne suis pas disponible à ces dates : ${token_url}?action=not_available` +
         `\n- Je ne recherche plus d'emploi : ${token_url}?action=not_looking`
     }
 
