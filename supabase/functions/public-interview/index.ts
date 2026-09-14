@@ -102,6 +102,8 @@ Deno.serve(async (req: Request) => {
           interview:interviews(
             id,
             interview_number,
+            interview_type,
+            interview_duration,
             candidate:candidates(id, first_name, last_name),
             job_offer:job_offers(title, company)
           )
@@ -149,6 +151,14 @@ Deno.serve(async (req: Request) => {
       const candidate = iv?.candidate
       const jobOffer = iv?.job_offer
       const candidateName = candidate ? `${candidate.first_name} ${candidate.last_name}` : 'Le candidat'
+
+      const ivTypeLabels: Record<string, string> = {
+        visio: 'Visioconférence',
+        presentiel: 'En présentiel',
+        phone: 'Appel téléphonique',
+      }
+      const ivTypeLabel = ivTypeLabels[iv?.interview_type] || 'Visioconférence'
+      const ivDurationLabel = iv?.interview_duration ? `${iv.interview_duration} min` : null
 
       if (slot_id) {
         await supabase
@@ -217,6 +227,15 @@ Deno.serve(async (req: Request) => {
           .single()
 
         if (candidateRecord?.email) {
+          const modalitesHtml = `
+            <table style="width:100%;border-collapse:collapse;margin:16px 0;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0">
+              <tr style="background:#f8fafc">
+                <td style="padding:10px 14px;font-size:13px;color:#64748b;font-weight:600;border-bottom:1px solid #e2e8f0">Format</td>
+                <td style="padding:10px 14px;font-size:13px;color:#0f172a;font-weight:600;border-bottom:1px solid #e2e8f0">${ivTypeLabel}</td>
+              </tr>
+              ${ivDurationLabel ? `<tr><td style="padding:10px 14px;font-size:13px;color:#64748b;font-weight:600">Dur&eacute;e</td><td style="padding:10px 14px;font-size:13px;color:#0f172a;font-weight:600">${ivDurationLabel}</td></tr>` : ''}
+            </table>`
+
           await sendEmail(
             candidateRecord.email,
             `✅ Votre entretien est confirmé — ${jobOffer?.title}`,
@@ -225,6 +244,7 @@ Deno.serve(async (req: Request) => {
               `<p>Bonjour ${candidate?.first_name},</p>
                <p>Votre créneau d&apos;entretien pour le poste <strong>${jobOffer?.title}</strong>${jobOffer?.company ? ` chez <strong>${jobOffer.company}</strong>` : ''} a bien &eacute;t&eacute; enregistr&eacute; :</p>
                <p style="background:#f0fdf4;border-left:4px solid #22c55e;padding:12px 16px;border-radius:0 8px 8px 0;font-weight:600;color:#15803d">${slotLabel}</p>
+               ${modalitesHtml}
                <p>L&apos;&eacute;quipe recrutement vous contactera pour vous confirmer les d&eacute;tails. &Agrave; bient&ocirc;t !</p>`
             )
           )

@@ -55,7 +55,15 @@ interface Interview {
   score: number | null
   ai_summary: string | null
   recommendation: string | null
+  interview_type: 'visio' | 'presentiel' | 'phone' | null
+  interview_duration: number | null
   slots?: { id: string; slot_datetime: string | null; label: string | null; status: string | null }[]
+}
+
+const interviewTypeConfig: Record<string, { label: string; icon: string }> = {
+  visio:       { label: 'Visioconférence', icon: '🎥' },
+  presentiel:  { label: 'En présentiel',   icon: '🏢' },
+  phone:       { label: 'Téléphone',       icon: '📞' },
 }
 
 const statusConfig: Record<string, { label: string; variant: 'blue' | 'green' | 'orange' | 'red' | 'gray' | 'purple' }> = {
@@ -109,6 +117,8 @@ export function CandidateDetailPage() {
   // Interview scheduling state
   const [showSchedule, setShowSchedule] = useState(false)
   const [scheduleFor, setScheduleFor] = useState<1 | 2 | 3>(1)
+  const [interviewType, setInterviewType] = useState<'visio' | 'presentiel' | 'phone'>('visio')
+  const [interviewDuration, setInterviewDuration] = useState<number>(45)
   const [slots, setSlots] = useState<Slot[]>([])
   const [msgSubject, setMsgSubject] = useState('')
   const [msgBody, setMsgBody] = useState('')
@@ -224,6 +234,8 @@ export function CandidateDetailPage() {
 
   const openSchedule = async (num: 1 | 2 | 3) => {
     setScheduleFor(num)
+    setInterviewType('visio')
+    setInterviewDuration(45)
     setSlots([])
     setMsgSubject('')
     setMsgBody('')
@@ -243,6 +255,8 @@ export function CandidateDetailPage() {
         job_offer: { title: candidate.job_offer.title, company: candidate.job_offer.company },
         slots,
         interview_link: link,
+        interview_type: interviewType,
+        interview_duration: interviewDuration,
       })
       setMsgSubject(result.subject)
       setMsgBody(result.message)
@@ -263,6 +277,8 @@ export function CandidateDetailPage() {
       organization_id: orgId,
       interview_number: scheduleFor,
       status: 'pending',
+      interview_type: interviewType,
+      interview_duration: interviewDuration,
     }).select().single()
 
     if (interview) {
@@ -635,7 +651,16 @@ export function CandidateDetailPage() {
             interviews.map(iv => (
               <Card key={iv.id}>
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-bold text-slate-900">Entretien {iv.interview_number}</h3>
+                  <div>
+                    <h3 className="font-bold text-slate-900">Entretien {iv.interview_number}</h3>
+                    {(iv.interview_type || iv.interview_duration) && (
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {iv.interview_type && `${interviewTypeConfig[iv.interview_type]?.icon} ${interviewTypeConfig[iv.interview_type]?.label}`}
+                        {iv.interview_type && iv.interview_duration && ' · '}
+                        {iv.interview_duration && `${iv.interview_duration} min`}
+                      </p>
+                    )}
+                  </div>
                   <Badge variant={iv.status === 'scheduled' ? 'green' : iv.status === 'completed' ? 'blue' : 'gray'}>
                     {iv.status === 'scheduled' ? 'Planifié' : iv.status === 'completed' ? 'Terminé' : 'En attente'}
                   </Badge>
@@ -789,6 +814,48 @@ export function CandidateDetailPage() {
               </div>
             </div>
             <div className="p-6 space-y-6">
+              {/* Type & durée */}
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <h3 className="font-semibold text-slate-900 mb-2 text-sm">Format</h3>
+                  <div className="flex flex-col gap-1.5">
+                    {(['visio', 'presentiel', 'phone'] as const).map(t => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setInterviewType(t)}
+                        className={`text-left px-3 py-2 rounded-xl text-sm font-medium border transition-all ${
+                          interviewType === t
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'border-slate-200 text-slate-600 hover:border-blue-300'
+                        }`}
+                      >
+                        {interviewTypeConfig[t].icon} {interviewTypeConfig[t].label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-900 mb-2 text-sm">Durée</h3>
+                  <div className="flex flex-col gap-1.5">
+                    {[15, 30, 45, 60, 90].map(d => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => setInterviewDuration(d)}
+                        className={`text-left px-3 py-2 rounded-xl text-sm font-medium border transition-all ${
+                          interviewDuration === d
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'border-slate-200 text-slate-600 hover:border-blue-300'
+                        }`}
+                      >
+                        {d} min
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <h3 className="font-semibold text-slate-900 mb-3">Créneaux proposés</h3>
                 <SlotPicker slots={slots} onChange={setSlots} />

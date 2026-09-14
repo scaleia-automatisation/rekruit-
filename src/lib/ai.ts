@@ -45,6 +45,8 @@ export async function generateMessage(params: {
   job_offer?: { title: string; company: string }
   slots?: { label: string }[]
   interview_link?: string
+  interview_type?: 'visio' | 'presentiel' | 'phone'
+  interview_duration?: number
 }) {
   const { data, error } = await supabase.functions.invoke('generate-message', { body: params })
   if (error) throw error
