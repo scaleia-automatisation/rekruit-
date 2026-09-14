@@ -41,21 +41,20 @@ Deno.serve(async (req: Request) => {
       .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" style="color:#2563eb">$1</a>')
       .replace(/\n/g, '<br>')
 
-    // Inject slot links + unavailability links directly into the body
+    // Build inline links block and replace [CRÉNEAUX] placeholder, or append at end
     let plainTextSlots = ''
     if (token_url && slots_data && Array.isArray(slots_data) && slots_data.length > 0) {
       const slotLinks = (slots_data as SlotData[]).map(slot =>
         `<a href="${token_url}?slot=${slot.id}" style="display:block;color:#2563eb;font-weight:700;text-decoration:underline;font-size:14px;margin-bottom:10px">&#128197; ${slot.label}</a>`
       ).join('')
 
-      htmlBody += `
-        <div style="margin-top:20px">
-          <p style="font-weight:700;font-size:13px;color:#1e293b;margin:0 0 12px 0">Cr&eacute;neaux disponibles :</p>
-          ${slotLinks}
-          <br>
-          <a href="${token_url}?action=not_available" style="display:block;color:#2563eb;font-weight:700;text-decoration:underline;font-size:14px;margin-bottom:6px">&#128197; Je ne suis pas disponible &agrave; ces dates</a>
-          <a href="${token_url}?action=not_looking" style="display:block;color:#2563eb;font-weight:700;text-decoration:underline;font-size:14px">&#128277; Je ne recherche plus d&apos;emploi</a>
-        </div>`
+      const linksBlock = `<div style="margin:16px 0">${slotLinks}<a href="${token_url}?action=not_available" style="display:block;color:#2563eb;font-weight:700;text-decoration:underline;font-size:14px;margin-bottom:6px;margin-top:6px">&#128197; Je ne suis pas disponible &agrave; ces dates</a><a href="${token_url}?action=not_looking" style="display:block;color:#2563eb;font-weight:700;text-decoration:underline;font-size:14px">&#128277; Je ne recherche plus d&apos;emploi</a></div>`
+
+      if (body.includes('[CRÉNEAUX]')) {
+        htmlBody = htmlBody.replace('[CRÉNEAUX]', linksBlock)
+      } else {
+        htmlBody += linksBlock
+      }
 
       plainTextSlots = '\n\nCréneaux disponibles :\n' +
         (slots_data as SlotData[]).map(s => `- ${s.label} : ${token_url}?slot=${s.id}`).join('\n') +

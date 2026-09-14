@@ -25,8 +25,9 @@ ${slotsText}
 
 IMPORTANT :
 - Ne mentionne PAS de lien ni d'URL dans le message.
-- Ne liste pas les créneaux dans le texte — des liens cliquables avec les dates seront ajoutés automatiquement juste en dessous du message.
-- Mentionne simplement que des créneaux sont disponibles ci-dessous et qu'il suffit de cliquer.
+- Ne liste PAS les dates/heures des créneaux telles quelles dans le texte.
+- À l'endroit exact où les créneaux doivent apparaître (après une phrase d'introduction et AVANT la phrase de clôture type "Dans l'attente"), écris UNIQUEMENT le mot-clé : [CRÉNEAUX]
+- Ce placeholder sera automatiquement remplacé par les liens cliquables.
 - L'email doit être court, chaleureux et professionnel.
 - Signe avec l'équipe RH.`,
 
