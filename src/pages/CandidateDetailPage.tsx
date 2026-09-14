@@ -230,6 +230,7 @@ export function CandidateDetailPage() {
         candidate_id: candidate.id,
         organization_id: orgId,
         status: 'pending',
+        recruiter_email: user?.email || null,
       }).select().single()
       if (tokenError) {
         console.error('Token insert failed:', tokenError)
