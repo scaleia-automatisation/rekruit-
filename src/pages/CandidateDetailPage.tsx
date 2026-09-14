@@ -3,7 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
   ArrowLeft, Mail, Phone, MapPin, Star, CheckCircle, XCircle, CalendarPlus, Trash2,
-  Wand2, Loader2, Send, Upload, Save, MailCheck, History, MessageSquare, UserCheck
+  Wand2, Loader2, Send, Upload, Save, MailCheck, History, MessageSquare, UserCheck, CheckSquare
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { generateMessage } from '../lib/ai'
@@ -216,6 +216,11 @@ export function CandidateDetailPage() {
     if (tab === 'historique' && candidate && history.length === 0) loadHistory()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, candidate])
+
+  const markInterviewDone = async (interviewId: string) => {
+    await supabase.from('interviews').update({ status: 'completed' }).eq('id', interviewId)
+    setInterviews(ivs => ivs.map(iv => iv.id === interviewId ? { ...iv, status: 'completed' } : iv))
+  }
 
   const openSchedule = async (num: 1 | 2 | 3) => {
     setScheduleFor(num)
@@ -656,6 +661,13 @@ export function CandidateDetailPage() {
                   </div>
                 )}
                 {iv.ai_summary && <p className="text-sm text-slate-600 mt-3">{iv.ai_summary}</p>}
+                {iv.status === 'scheduled' && (
+                  <div className="mt-3 pt-3 border-t border-slate-100">
+                    <Button size="sm" variant="secondary" onClick={() => markInterviewDone(iv.id)}>
+                      <CheckSquare size={14} className="text-green-600" /> Marquer comme terminé
+                    </Button>
+                  </div>
+                )}
               </Card>
             ))
           )}

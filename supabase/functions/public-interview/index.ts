@@ -209,6 +209,37 @@ Deno.serve(async (req: Request) => {
           )
         }
 
+        // Confirmation email to candidate
+        const { data: candidateRecord } = await supabase
+          .from('candidates')
+          .select('email')
+          .eq('id', tokenData.candidate_id)
+          .single()
+
+        if (candidateRecord?.email) {
+          await sendEmail(
+            candidateRecord.email,
+            `✅ Votre entretien est confirmé — ${jobOffer?.title}`,
+            notifHtml(
+              `Entretien ${iv?.interview_number} confirmé`,
+              `<p>Bonjour ${candidate?.first_name},</p>
+               <p>Votre créneau d&apos;entretien pour le poste <strong>${jobOffer?.title}</strong>${jobOffer?.company ? ` chez <strong>${jobOffer.company}</strong>` : ''} a bien &eacute;t&eacute; enregistr&eacute; :</p>
+               <p style="background:#f0fdf4;border-left:4px solid #22c55e;padding:12px 16px;border-radius:0 8px 8px 0;font-weight:600;color:#15803d">${slotLabel}</p>
+               <p>L&apos;&eacute;quipe recrutement vous contactera pour vous confirmer les d&eacute;tails. &Agrave; bient&ocirc;t !</p>`
+            )
+          )
+          await supabase.from('messages').insert({
+            candidate_id: candidate?.id,
+            organization_id: tokenData.organization_id,
+            type: 'email',
+            subject: `Confirmation entretien ${iv?.interview_number} — ${slotLabel}`,
+            content: `Email de confirmation envoyé au candidat pour le créneau : ${slotLabel}`,
+            channel: 'outbound',
+            status: 'sent',
+            sent_at: new Date().toISOString(),
+          })
+        }
+
         return new Response(JSON.stringify({ success: true, result: 'slot_confirmed' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
