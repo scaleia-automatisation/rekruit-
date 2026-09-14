@@ -3,7 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
   ArrowLeft, Mail, Phone, MapPin, Star, CheckCircle, XCircle, CalendarPlus, Trash2,
-  Wand2, Loader2, Send, Upload, Save, MailCheck
+  Wand2, Loader2, Send, Upload, Save, MailCheck, History, MessageSquare, UserCheck
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { generateMessage } from '../lib/ai'
@@ -76,7 +76,15 @@ const statusConfig: Record<string, { label: string; variant: 'blue' | 'green' | 
 
 const pipeline: CandidateStatus[] = ['new', 'analyzed', 'shortlisted', 'interview_1', 'interview_2', 'interview_3', 'hired']
 
-type Tab = 'info' | 'ai' | 'cv' | 'entretiens' | 'decision'
+type Tab = 'info' | 'ai' | 'cv' | 'entretiens' | 'decision' | 'historique'
+
+interface HistoryItem {
+  id: string
+  kind: 'email_out' | 'email_in' | 'decision'
+  date: string
+  title: string
+  content?: string
+}
 
 export function CandidateDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -103,6 +111,35 @@ export function CandidateDetailPage() {
   const [scheduleSaving, setScheduleSaving] = useState(false)
   const [scheduleSuccess, setScheduleSuccess] = useState(false)
   const [emailToast, setEmailToast] = useState<string | null>(null)
+  const [history, setHistory] = useState<HistoryItem[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+
+  const loadHistory = async () => {
+    if (!candidate) return
+    setHistoryLoading(true)
+    const [{ data: msgs }, { data: logs }] = await Promise.all([
+      supabase.from('messages').select('id, subject, content, channel, status, sent_at, created_at').eq('candidate_id', candidate.id).order('created_at', { ascending: false }),
+      supabase.from('audit_logs').select('id, action, metadata, created_at').eq('entity', 'candidate').eq('entity_id', candidate.id).order('created_at', { ascending: false }),
+    ])
+    const items: HistoryItem[] = [
+      ...(msgs || []).map(m => ({
+        id: m.id,
+        kind: (m.channel === 'inbound' ? 'email_in' : 'email_out') as HistoryItem['kind'],
+        date: m.sent_at || m.created_at,
+        title: m.subject || (m.channel === 'inbound' ? 'Réponse du candidat' : 'Email envoyé'),
+        content: m.content,
+      })),
+      ...(logs || []).map(l => ({
+        id: l.id,
+        kind: 'decision' as HistoryItem['kind'],
+        date: l.created_at,
+        title: `Statut → ${statusConfig[l.metadata?.to]?.label || l.metadata?.to || ''}`,
+        content: l.metadata?.from ? `Précédent : ${statusConfig[l.metadata?.from]?.label || l.metadata?.from}` : undefined,
+      })),
+    ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    setHistory(items)
+    setHistoryLoading(false)
+  }
 
   useEffect(() => {
     const load = async () => {
@@ -122,9 +159,20 @@ export function CandidateDetailPage() {
   const updateStatus = async (status: CandidateStatus) => {
     if (!candidate) return
     setStatusLoading(true)
+    const prevStatus = candidate.status
     const progression = { new: 0, analyzing: 10, analyzed: 20, shortlisted: 30, interview_1: 40, interview_2: 60, interview_3: 80, offer: 90, hired: 100, rejected: 0, pool: 20, unavailable: 0, not_looking: 0 }[status] || 0
     const { data } = await supabase.from('candidates').update({ status, progression }).eq('id', candidate.id).select().single()
-    if (data) setCandidate(c => c ? { ...c, status: data.status, progression: data.progression } : c)
+    if (data) {
+      setCandidate(c => c ? { ...c, status: data.status, progression: data.progression } : c)
+      await supabase.from('audit_logs').insert({
+        organization_id: profile?.organization_id,
+        user_id: user?.id,
+        action: 'status_changed',
+        entity: 'candidate',
+        entity_id: candidate.id,
+        metadata: { from: prevStatus, to: status },
+      })
+    }
     setStatusLoading(false)
   }
 
@@ -158,6 +206,11 @@ export function CandidateDetailPage() {
     }
     setCvUploading(false)
   }
+
+  useEffect(() => {
+    if (tab === 'historique' && candidate && history.length === 0) loadHistory()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, candidate])
 
   const openSchedule = async (num: 1 | 2 | 3) => {
     setScheduleFor(num)
@@ -268,11 +321,13 @@ export function CandidateDetailPage() {
         }
         await supabase.from('messages').insert({
           candidate_id: candidate.id,
-          organization_id: (candidate as unknown as { organization_id: string }).organization_id,
+          organization_id: orgId,
           type: 'email',
           subject: msgSubject,
           content: finalBody,
+          channel: 'outbound',
           status: 'sent',
+          sent_at: new Date().toISOString(),
         }).then(() => {})
         setEmailToast(candidate.email)
         setTimeout(() => setEmailToast(null), 4000)
@@ -313,6 +368,7 @@ export function CandidateDetailPage() {
     { id: 'cv', label: 'CV' },
     { id: 'entretiens', label: `Entretiens (${interviews.length})` },
     { id: 'decision', label: 'Décision' },
+    { id: 'historique', label: 'Historique' },
   ]
 
   return (
@@ -637,6 +693,65 @@ export function CandidateDetailPage() {
               </Button>
             </div>
           </Card>
+        </div>
+      )}
+
+      {tab === 'historique' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-bold text-slate-900">Historique des interactions</h2>
+            <button onClick={loadHistory} disabled={historyLoading} className="text-xs text-blue-600 hover:underline">
+              {historyLoading ? <Loader2 size={14} className="animate-spin inline" /> : '↻ Actualiser'}
+            </button>
+          </div>
+          {history.length === 0 && !historyLoading ? (
+            <Card>
+              <div className="text-center py-10">
+                <History size={36} className="mx-auto text-slate-200 mb-3" />
+                <p className="text-slate-500 font-medium mb-1">Aucun historique</p>
+                <p className="text-sm text-slate-400">Les emails envoyés, réponses du candidat et décisions apparaîtront ici.</p>
+                <button onClick={loadHistory} className="mt-4 text-sm text-blue-600 hover:underline">Charger l'historique</button>
+              </div>
+            </Card>
+          ) : (
+            <div className="relative">
+              <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-slate-100" />
+              <div className="space-y-4">
+                {history.map(item => {
+                  const isOut = item.kind === 'email_out'
+                  const isIn = item.kind === 'email_in'
+                  const isDecision = item.kind === 'decision'
+                  return (
+                    <div key={item.id} className="relative flex gap-4">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${
+                        isOut ? 'bg-blue-100' : isIn ? 'bg-green-100' : 'bg-slate-100'
+                      }`}>
+                        {isOut && <MessageSquare size={16} className="text-blue-600" />}
+                        {isIn && <Mail size={16} className="text-green-600" />}
+                        {isDecision && <UserCheck size={16} className="text-slate-500" />}
+                      </div>
+                      <div className="flex-1 bg-white rounded-2xl border border-slate-200 p-4 min-w-0">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <p className="font-semibold text-slate-900 text-sm">{item.title}</p>
+                          <span className="text-xs text-slate-400 whitespace-nowrap flex-shrink-0">
+                            {new Date(item.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        {item.content && (
+                          <p className="text-xs text-slate-500 mt-1 line-clamp-3 whitespace-pre-wrap">{item.content}</p>
+                        )}
+                        <span className={`inline-block text-[10px] font-semibold uppercase tracking-wide mt-2 px-2 py-0.5 rounded-full ${
+                          isOut ? 'bg-blue-50 text-blue-600' : isIn ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500'
+                        }`}>
+                          {isOut ? 'Email envoyé' : isIn ? 'Réponse candidat' : 'Décision recruteur'}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

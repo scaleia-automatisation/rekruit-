@@ -185,6 +185,17 @@ Deno.serve(async (req: Request) => {
           content: notifContent,
         })
 
+        await supabase.from('messages').insert({
+          candidate_id: candidate?.id,
+          organization_id: tokenData.organization_id,
+          type: 'email',
+          subject: `Réponse candidat : créneau confirmé — ${slotLabel}`,
+          content: `${candidateName} a confirmé le créneau : ${slotLabel}`,
+          channel: 'inbound',
+          status: 'delivered',
+          sent_at: new Date().toISOString(),
+        })
+
         if (recruiterEmail) {
           await sendEmail(
             recruiterEmail,
@@ -240,6 +251,17 @@ Deno.serve(async (req: Request) => {
           type: action === 'not_available' ? 'candidate_unavailable' : 'candidate_not_looking',
           title: notifTitle,
           content: notifContent,
+        })
+
+        await supabase.from('messages').insert({
+          candidate_id: candidate?.id,
+          organization_id: tokenData.organization_id,
+          type: 'email',
+          subject: action === 'not_available' ? 'Réponse candidat : non disponible à ces dates' : 'Réponse candidat : ne recherche plus d\'emploi',
+          content: `${candidateName} ${actionLabel}`,
+          channel: 'inbound',
+          status: 'delivered',
+          sent_at: new Date().toISOString(),
         })
 
         if (recruiterEmail) {
