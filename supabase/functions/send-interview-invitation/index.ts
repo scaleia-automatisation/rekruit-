@@ -56,7 +56,7 @@ ${slotButtons}
 <a href="${token_url}?action=not_looking" style="display:block;background:#f8fafc;color:#64748b;font-weight:500;font-size:14px;text-align:center;text-decoration:none;padding:14px 20px;border-radius:12px;border:1px solid #e2e8f0">&#128277; Je ne recherche plus d&apos;emploi</a>
 </div>`
 
-      if (body.includes('[CRÉNEAUX]')) {
+      if (htmlBody.includes('[CRÉNEAUX]')) {
         htmlBody = htmlBody.replace('[CRÉNEAUX]', linksBlock)
       } else {
         htmlBody += linksBlock
@@ -68,6 +68,9 @@ ${slotButtons}
         `\n- Je ne suis pas disponible à ces dates : ${token_url}?action=not_available` +
         `\n- Je ne recherche plus d'emploi : ${token_url}?action=not_looking`
     }
+
+    // Safety: remove any leftover [CRÉNEAUX] placeholder if slots were empty
+    htmlBody = htmlBody.replace('[CRÉNEAUX]', '')
 
     // Email-client-safe HTML (no flexbox — use inline-block instead)
     const html = `<!DOCTYPE html>
