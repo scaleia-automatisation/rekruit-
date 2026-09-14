@@ -24,6 +24,7 @@ interface Offer {
   preferred_criteria: string | null
   full_offer: string | null
   created_at: string
+  interview_rounds: number
 }
 
 interface Candidate {
@@ -64,6 +65,7 @@ export function OfferDetailPage() {
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [loading, setLoading] = useState(true)
   const [offerStatus, setOfferStatus] = useState('')
+  const [interviewRounds, setInterviewRounds] = useState(2)
 
   useEffect(() => {
     const load = async () => {
@@ -73,7 +75,7 @@ export function OfferDetailPage() {
         supabase.from('candidates').select('id, first_name, last_name, email, status, score_global, created_at')
           .eq('job_offer_id', id).order('created_at', { ascending: false }),
       ])
-      if (o) { setOffer(o as Offer); setOfferStatus(o.status) }
+      if (o) { setOffer(o as Offer); setOfferStatus(o.status); setInterviewRounds((o as Offer).interview_rounds ?? 2) }
       if (c) setCandidates(c as Candidate[])
       setLoading(false)
     }
@@ -85,6 +87,13 @@ export function OfferDetailPage() {
     await supabase.from('job_offers').update({ status }).eq('id', id)
     setOfferStatus(status)
     if (offer) setOffer({ ...offer, status })
+  }
+
+  const updateInterviewRounds = async (rounds: number) => {
+    if (!id) return
+    await supabase.from('job_offers').update({ interview_rounds: rounds }).eq('id', id)
+    setInterviewRounds(rounds)
+    if (offer) setOffer({ ...offer, interview_rounds: rounds })
   }
 
   const handleDelete = async () => {
@@ -175,6 +184,26 @@ export function OfferDetailPage() {
                 </button>
               )
             })}
+          </div>
+        </div>
+
+        {/* Interview rounds */}
+        <div className="mt-4 pt-4 border-t border-slate-100">
+          <p className="text-xs text-slate-500 mb-2">Nombre d'entretiens</p>
+          <div className="flex gap-2">
+            {[1, 2, 3].map(n => (
+              <button
+                key={n}
+                onClick={() => updateInterviewRounds(n)}
+                className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
+                  interviewRounds === n
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'border-slate-200 text-slate-600 hover:border-blue-300'
+                }`}
+              >
+                {n} entretien{n > 1 ? 's' : ''}
+              </button>
+            ))}
           </div>
         </div>
       </div>

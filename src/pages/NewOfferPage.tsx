@@ -33,6 +33,7 @@ type OfferForm = {
   preferred_criteria: string
   recruitment_process: string
   full_offer: string
+  interview_rounds: number
 }
 
 function buildMarkdown(f: OfferForm): string {
@@ -61,6 +62,7 @@ const emptyForm: OfferForm = {
   start_date: '', description: '', missions: '', skills: '', experience: '',
   education: '', languages: '', benefits: '', team_size: '',
   mandatory_criteria: '', preferred_criteria: '', recruitment_process: '', full_offer: '',
+  interview_rounds: 2,
 }
 
 export function NewOfferPage() {
@@ -92,7 +94,7 @@ export function NewOfferPage() {
         const next = { ...f } as OfferForm
         for (const [k, v] of Object.entries(data)) {
           if (v !== null && v !== undefined && v !== '' && k in next) {
-            (next as Record<string, string>)[k] = String(v)
+            (next as unknown as Record<string, string>)[k] = String(v)
           }
         }
         if (!next.full_offer) next.full_offer = buildMarkdown(next)
@@ -301,6 +303,26 @@ export function NewOfferPage() {
             <TextareaField label="Taille & contexte de l'équipe" value={form.team_size} onChange={v => set('team_size', v)} rows={3} />
           </div>
           <TextareaField label="Processus de recrutement" value={form.recruitment_process} onChange={v => set('recruitment_process', v)} rows={3} />
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Nombre d'entretiens</label>
+            <div className="flex gap-2">
+              {[1, 2, 3].map(n => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, interview_rounds: n }))}
+                  className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all border ${
+                    form.interview_rounds === n
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'border-slate-200 text-slate-600 hover:border-blue-300'
+                  }`}
+                >
+                  {n} entretien{n > 1 ? 's' : ''}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-slate-400 mt-1.5">La pipeline candidat s'arrêtera à l'entretien {form.interview_rounds}.</p>
+          </div>
         </div>
 
         {/* Toute l'offre */}

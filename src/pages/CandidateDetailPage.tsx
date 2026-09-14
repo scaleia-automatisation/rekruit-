@@ -44,7 +44,7 @@ interface Candidate {
   cv_file_url: string | null
   cover_letter: string | null
   job_offer_id: string | null
-  job_offer?: { id: string; title: string; company: string; description?: string; skills?: string; experience?: string } | null
+  job_offer?: { id: string; title: string; company: string; description?: string; skills?: string; experience?: string; interview_rounds?: number } | null
 }
 
 interface Interview {
@@ -74,7 +74,12 @@ const statusConfig: Record<string, { label: string; variant: 'blue' | 'green' | 
   not_looking: { label: 'Ne recherche plus', variant: 'red' },
 }
 
-const pipeline: CandidateStatus[] = ['new', 'analyzed', 'shortlisted', 'interview_1', 'interview_2', 'interview_3', 'hired']
+function buildPipeline(rounds: number): CandidateStatus[] {
+  return ['new', 'analyzed', 'shortlisted',
+    ...Array.from({ length: rounds }, (_, i) => `interview_${i + 1}` as CandidateStatus),
+    'hired',
+  ]
+}
 
 type Tab = 'info' | 'ai' | 'cv' | 'entretiens' | 'decision' | 'historique'
 
@@ -145,7 +150,7 @@ export function CandidateDetailPage() {
     const load = async () => {
       if (!id) return
       const [{ data: c }, { data: iv }] = await Promise.all([
-        supabase.from('candidates').select('*, job_offer:job_offers(id, title, company, description, skills, experience)').eq('id', id).single(),
+        supabase.from('candidates').select('*, job_offer:job_offers(id, title, company, description, skills, experience, interview_rounds)').eq('id', id).single(),
         supabase.from('interviews').select('*, slots:interview_slots(*)').eq('candidate_id', id).order('interview_number'),
       ])
       setCandidate(c as Candidate)
@@ -361,6 +366,8 @@ export function CandidateDetailPage() {
   )
 
   const st = statusConfig[candidate.status] || { label: candidate.status, variant: 'gray' as const }
+  const interviewRounds = candidate.job_offer?.interview_rounds ?? 2
+  const pipeline = buildPipeline(interviewRounds)
   const currentPipelineStep = pipeline.indexOf(candidate.status as CandidateStatus)
   const tabs: { id: Tab; label: string }[] = [
     { id: 'info', label: 'Infos' },
@@ -460,9 +467,11 @@ export function CandidateDetailPage() {
           <Button size="sm" variant="secondary" onClick={() => updateStatus('shortlisted')} disabled={statusLoading || candidate.status === 'shortlisted'}>
             <CheckCircle size={15} className="text-green-500" /> Retenir
           </Button>
-          <Button size="sm" onClick={() => openSchedule(interviews.length < 1 ? 1 : interviews.length < 2 ? 2 : 3)} disabled={statusLoading}>
-            <CalendarPlus size={15} /> Planifier entretien
-          </Button>
+          {interviews.length < interviewRounds && (
+            <Button size="sm" onClick={() => openSchedule((interviews.length + 1) as 1 | 2 | 3)} disabled={statusLoading}>
+              <CalendarPlus size={15} /> Planifier entretien {interviews.length + 1}
+            </Button>
+          )}
         </div>
       </Card>
 
@@ -650,7 +659,7 @@ export function CandidateDetailPage() {
               </Card>
             ))
           )}
-          {interviews.length > 0 && interviews.length < 3 && (
+          {interviews.length > 0 && interviews.length < interviewRounds && (
             <Button size="sm" variant="secondary" onClick={() => openSchedule((interviews.length + 1) as 1 | 2 | 3)}>
               <CalendarPlus size={15} /> Planifier entretien {interviews.length + 1}
             </Button>
