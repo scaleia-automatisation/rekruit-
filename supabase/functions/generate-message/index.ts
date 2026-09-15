@@ -11,7 +11,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { type, candidate, job_offer, slots, interview_link, interview_type, interview_duration } = await req.json()
+    const { type, candidate, job_offer, slots, interview_link, interview_type, interview_duration, interviewers } = await req.json()
     const apiKey = Deno.env.get('OPENAI_API_KEY')
     const model = Deno.env.get('AI_MODEL') || 'gpt-4o'
 
@@ -25,18 +25,24 @@ Deno.serve(async (req: Request) => {
     const typeLabel = interviewTypeLabel[interview_type] || 'en visioconférence'
     const durationLabel = interview_duration ? `${interview_duration} minutes` : '45 minutes'
 
+    const interviewersLine = Array.isArray(interviewers) && interviewers.length > 0
+      ? `- Intervieweur(s) : ${interviewers.map((iv: { first_name: string; last_name: string; job_title?: string }) => `${iv.first_name} ${iv.last_name}${iv.job_title ? ` (${iv.job_title})` : ''}`).join(', ')}`
+      : ''
+
     const prompts: Record<string, string> = {
       interview_invitation: `Rédige un email professionnel et chaleureux pour inviter ${candidate?.first_name} ${candidate?.last_name} à un entretien pour le poste de ${job_offer?.title} chez ${job_offer?.company}.
 
 Modalités de l'entretien :
 - Format : ${typeLabel}
 - Durée prévue : ${durationLabel}
+${interviewersLine}
 
 Les créneaux proposés sont :
 ${slotsText}
 
 IMPORTANT :
 - Mentionne le format (${typeLabel}) et la durée (${durationLabel}) de l'entretien dans le corps de l'email.
+${interviewersLine ? `- Mentionne avec qui le candidat aura l'entretien (${interviewers.map((iv: { first_name: string; last_name: string; job_title?: string }) => `${iv.first_name} ${iv.last_name}${iv.job_title ? `, ${iv.job_title}` : ''}`).join(' et ')}).` : ''}
 - Ne mentionne PAS de lien ni d'URL dans le message.
 - Ne liste PAS les dates/heures des créneaux telles quelles dans le texte.
 - À l'endroit exact où les créneaux doivent apparaître (après une phrase d'introduction et AVANT la phrase de clôture type "Dans l'attente"), écris UNIQUEMENT le mot-clé : [CRÉNEAUX]

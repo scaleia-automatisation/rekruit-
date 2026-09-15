@@ -3,10 +3,11 @@ import { Link, useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
   ArrowLeft, Mail, Phone, MapPin, Star, CheckCircle, XCircle, CalendarPlus, Trash2,
-  Wand2, Loader2, Send, Upload, Save, MailCheck, History, MessageSquare, UserCheck, CheckSquare
+  Wand2, Loader2, Send, Upload, Save, MailCheck, History, MessageSquare, UserCheck, CheckSquare,
+  Users, ChevronDown, ChevronUp, ClipboardList
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { generateMessage } from '../lib/ai'
+import { generateMessage, generateInterviewQuestions } from '../lib/ai'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -47,6 +48,19 @@ interface Candidate {
   job_offer?: { id: string; title: string; company: string; description?: string; skills?: string; experience?: string; interview_rounds?: number } | null
 }
 
+interface OrgMember {
+  id: string
+  first_name: string
+  last_name: string
+  job_title: string | null
+}
+
+interface InterviewQuestion {
+  question: string
+  category: string
+  tip: string
+}
+
 interface Interview {
   id: string
   interview_number: number
@@ -57,6 +71,8 @@ interface Interview {
   recommendation: string | null
   interview_type: 'visio' | 'presentiel' | 'phone' | null
   interview_duration: number | null
+  interviewers: OrgMember[] | null
+  questions: InterviewQuestion[] | null
   slots?: { id: string; slot_datetime: string | null; label: string | null; status: string | null }[]
 }
 
@@ -129,6 +145,14 @@ export function CandidateDetailPage() {
   const [history, setHistory] = useState<HistoryItem[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
 
+  // Org members & interviewers
+  const [orgMembers, setOrgMembers] = useState<OrgMember[]>([])
+  const [selectedInterviewers, setSelectedInterviewers] = useState<OrgMember[]>([])
+
+  // Questionnaire state
+  const [generatingQuestions, setGeneratingQuestions] = useState<string | null>(null)
+  const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set())
+
   const loadHistory = async () => {
     if (!candidate) return
     setHistoryLoading(true)
@@ -170,6 +194,19 @@ export function CandidateDetailPage() {
     }
     load()
   }, [id])
+
+  useEffect(() => {
+    const loadMembers = async () => {
+      if (!profile?.organization_id) return
+      const { data } = await supabase
+        .from('organization_members')
+        .select('id, first_name, last_name, job_title')
+        .eq('organization_id', profile.organization_id)
+        .order('first_name')
+      setOrgMembers((data || []) as OrgMember[])
+    }
+    loadMembers()
+  }, [profile?.organization_id])
 
   const updateStatus = async (status: CandidateStatus) => {
     if (!candidate) return
@@ -240,7 +277,44 @@ export function CandidateDetailPage() {
     setMsgSubject('')
     setMsgBody('')
     setScheduleSuccess(false)
+    setSelectedInterviewers([])
     setShowSchedule(true)
+  }
+
+  const toggleInterviewer = (m: OrgMember) => {
+    setSelectedInterviewers(prev => {
+      const has = prev.some(x => x.id === m.id)
+      if (has) return prev.filter(x => x.id !== m.id)
+      if (prev.length >= 2) return prev
+      return [...prev, m]
+    })
+  }
+
+  const generateQuestionnaire = async (iv: Interview) => {
+    if (!candidate) return
+    setGeneratingQuestions(iv.id)
+    try {
+      const result = await generateInterviewQuestions({
+        candidate: { first_name: candidate.first_name, last_name: candidate.last_name },
+        job_offer: candidate.job_offer
+          ? { title: candidate.job_offer.title, company: candidate.job_offer.company, description: candidate.job_offer.description, skills: candidate.job_offer.skills, experience: candidate.job_offer.experience }
+          : undefined,
+        interview_number: iv.interview_number,
+        interview_duration: iv.interview_duration ?? 45,
+        cv_text: candidate.cv_text ?? undefined,
+        ai_summary: candidate.ai_summary ?? undefined,
+        ai_strengths: candidate.ai_strengths ?? undefined,
+        ai_weaknesses: candidate.ai_weaknesses ?? undefined,
+        missing_skills: candidate.missing_skills ?? undefined,
+      })
+      if (result.questions) {
+        await supabase.from('interviews').update({ questions: result.questions }).eq('id', iv.id)
+        setInterviews(ivs => ivs.map(x => x.id === iv.id ? { ...x, questions: result.questions } : x))
+        setExpandedQuestions(prev => new Set([...prev, iv.id]))
+      }
+    } finally {
+      setGeneratingQuestions(null)
+    }
   }
 
   const generateMsg = async () => {
@@ -257,6 +331,7 @@ export function CandidateDetailPage() {
         interview_link: link,
         interview_type: interviewType,
         interview_duration: interviewDuration,
+        interviewers: selectedInterviewers.length > 0 ? selectedInterviewers : undefined,
       })
       setMsgSubject(result.subject)
       setMsgBody(result.message)
@@ -279,6 +354,7 @@ export function CandidateDetailPage() {
       status: 'pending',
       interview_type: interviewType,
       interview_duration: interviewDuration,
+      interviewers: selectedInterviewers.length > 0 ? selectedInterviewers : [],
     }).select().single()
 
     if (interview) {
@@ -686,6 +762,89 @@ export function CandidateDetailPage() {
                   </div>
                 )}
                 {iv.ai_summary && <p className="text-sm text-slate-600 mt-3">{iv.ai_summary}</p>}
+                {/* Interviewers badge */}
+                {iv.interviewers && iv.interviewers.length > 0 && (
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    <Users size={13} className="text-slate-400 shrink-0" />
+                    {iv.interviewers.map(m => (
+                      <span key={m.id} className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">
+                        {m.first_name} {m.last_name}{m.job_title ? ` · ${m.job_title}` : ''}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Questionnaire */}
+                {(iv.status === 'scheduled' || iv.status === 'pending' || iv.questions) && (
+                  <div className="mt-3 pt-3 border-t border-slate-100">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                        <ClipboardList size={13} /> Questionnaire
+                        {iv.questions && <span className="normal-case font-normal text-slate-400">({iv.questions.length} questions)</span>}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => generateQuestionnaire(iv)}
+                          loading={generatingQuestions === iv.id}
+                          disabled={generatingQuestions !== null}
+                        >
+                          {iv.questions ? <><Wand2 size={13} /> Regénérer</> : <><Wand2 size={13} /> Générer</>}
+                        </Button>
+                        {iv.questions && (
+                          <button
+                            onClick={() => setExpandedQuestions(prev => {
+                              const next = new Set(prev)
+                              next.has(iv.id) ? next.delete(iv.id) : next.add(iv.id)
+                              return next
+                            })}
+                            className="text-slate-400 hover:text-slate-600 p-1"
+                          >
+                            {expandedQuestions.has(iv.id) ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    {iv.questions && expandedQuestions.has(iv.id) && (
+                      <div className="space-y-2 mt-2">
+                        {iv.questions.map((q, i) => {
+                          const catColors: Record<string, string> = {
+                            motivation: 'bg-blue-50 text-blue-700',
+                            competences: 'bg-green-50 text-green-700',
+                            experience: 'bg-purple-50 text-purple-700',
+                            comportemental: 'bg-orange-50 text-orange-700',
+                            situationnel: 'bg-yellow-50 text-yellow-700',
+                            culture_fit: 'bg-pink-50 text-pink-700',
+                          }
+                          const catLabels: Record<string, string> = {
+                            motivation: 'Motivation',
+                            competences: 'Compétences',
+                            experience: 'Expérience',
+                            comportemental: 'Comportemental',
+                            situationnel: 'Situationnel',
+                            culture_fit: 'Culture fit',
+                          }
+                          return (
+                            <div key={i} className="bg-slate-50 rounded-xl p-3">
+                              <div className="flex items-start gap-2">
+                                <span className="text-slate-400 font-bold text-xs mt-0.5 shrink-0 w-5">{i + 1}.</span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm text-slate-800 font-medium leading-snug">{q.question}</p>
+                                  {q.tip && <p className="text-xs text-slate-500 mt-1 italic">💡 {q.tip}</p>}
+                                </div>
+                                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${catColors[q.category] || 'bg-slate-100 text-slate-500'}`}>
+                                  {catLabels[q.category] || q.category}
+                                </span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {iv.status === 'scheduled' && (
                   <div className="mt-3 pt-3 border-t border-slate-100">
                     <Button size="sm" variant="secondary" onClick={() => markInterviewDone(iv.id)}>
@@ -855,6 +1014,48 @@ export function CandidateDetailPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Intervieweurs */}
+              {orgMembers.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <h3 className="font-semibold text-slate-900 text-sm">Intervieweurs</h3>
+                    <span className="text-xs text-slate-400">(max 2)</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {orgMembers.map(m => {
+                      const sel = selectedInterviewers.some(x => x.id === m.id)
+                      const disabled = !sel && selectedInterviewers.length >= 2
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => toggleInterviewer(m)}
+                          disabled={disabled}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-medium transition-all ${
+                            sel
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : disabled
+                              ? 'border-slate-100 text-slate-300 cursor-not-allowed'
+                              : 'border-slate-200 text-slate-600 hover:border-blue-300'
+                          }`}
+                        >
+                          <span className={`w-6 h-6 rounded-lg text-xs font-bold flex items-center justify-center ${sel ? 'bg-blue-500' : 'bg-slate-100 text-slate-500'}`}>
+                            {m.first_name[0]}{m.last_name[0]}
+                          </span>
+                          <span>{m.first_name} {m.last_name}</span>
+                          {m.job_title && <span className={`text-xs ${sel ? 'text-blue-200' : 'text-slate-400'}`}>· {m.job_title}</span>}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {orgMembers.length === 0 && (
+                    <p className="text-xs text-slate-400">
+                      Aucun membre — <a href="/parametres/equipe" className="text-blue-600 hover:underline">ajoutez des membres</a> dans les paramètres.
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div>
                 <h3 className="font-semibold text-slate-900 mb-3">Créneaux proposés</h3>

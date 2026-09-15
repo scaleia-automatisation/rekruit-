@@ -39,6 +39,22 @@ export async function analyzeInterview(params: {
   return data
 }
 
+export async function generateInterviewQuestions(params: {
+  candidate?: { first_name: string; last_name: string }
+  job_offer?: { title: string; company: string; description?: string; skills?: string; experience?: string }
+  interview_number?: number
+  interview_duration?: number
+  cv_text?: string
+  ai_summary?: string
+  ai_strengths?: string
+  ai_weaknesses?: string
+  missing_skills?: string
+}) {
+  const { data, error } = await supabase.functions.invoke('generate-interview-questions', { body: params })
+  if (error) throw error
+  return data as { questions: { question: string; category: string; tip: string }[] }
+}
+
 export async function generateMessage(params: {
   type: 'interview_invitation' | 'shortlist' | 'rejection' | 'offer'
   candidate?: { first_name: string; last_name: string }
@@ -47,6 +63,7 @@ export async function generateMessage(params: {
   interview_link?: string
   interview_type?: 'visio' | 'presentiel' | 'phone'
   interview_duration?: number
+  interviewers?: { first_name: string; last_name: string; job_title?: string | null }[]
 }) {
   const { data, error } = await supabase.functions.invoke('generate-message', { body: params })
   if (error) throw error
