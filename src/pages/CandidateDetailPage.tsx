@@ -7,7 +7,7 @@ import {
   Users, ChevronDown, ChevronUp, ClipboardList, Mic
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { generateMessage, generateInterviewQuestions, analyzeInterview, transcribeAudio } from '../lib/ai'
+import { generateMessage, generateInterviewQuestions, analyzeInterview, transcribeAudio, analyzeTechnicalTest } from '../lib/ai'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -76,6 +76,10 @@ interface Interview {
   recruiter_notes: string | null
   audio_transcript: string | null
   transcript_labelled: string | null
+  technical_subject_url: string | null
+  technical_copy_url: string | null
+  score_technique: number | null
+  technical_analysis: string | null
   score_communication: number | null
   score_motivation: number | null
   score_competences: number | null
@@ -173,6 +177,12 @@ export function CandidateDetailPage() {
   const [transcriptSavedId, setTranscriptSavedId] = useState<string | null>(null)
   const [transcribingAudio, setTranscribingAudio] = useState<string | null>(null)
   const [analyzingInterview, setAnalyzingInterview] = useState<string | null>(null)
+
+  // Technical test state
+  const [techTestOpen, setTechTestOpen] = useState<Set<string>>(new Set())
+  const [techSubjectFile, setTechSubjectFile] = useState<Record<string, File | null>>({})
+  const [techCopyFile, setTechCopyFile] = useState<Record<string, File | null>>({})
+  const [analyzingTechTest, setAnalyzingTechTest] = useState<string | null>(null)
 
   // Post-decision email modal (hired / rejection from interview)
   const [postDecisionModal, setPostDecisionModal] = useState<{
@@ -428,6 +438,49 @@ export function CandidateDetailPage() {
       alert(`Erreur d'analyse : ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setAnalyzingInterview(null)
+    }
+  }
+
+  const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((res, rej) => {
+      const reader = new FileReader()
+      reader.onload = () => res((reader.result as string).split(',')[1])
+      reader.onerror = rej
+      reader.readAsDataURL(file)
+    })
+
+  const handleTechTestAnalysis = async (iv: Interview) => {
+    if (!candidate) return
+    const subjectFile = techSubjectFile[iv.id]
+    const copyFile = techCopyFile[iv.id]
+    if (!subjectFile || !copyFile) return
+    setAnalyzingTechTest(iv.id)
+    try {
+      const [subjectB64, copyB64] = await Promise.all([fileToBase64(subjectFile), fileToBase64(copyFile)])
+      const result = await analyzeTechnicalTest({
+        subject_base64: subjectB64,
+        subject_media_type: subjectFile.type,
+        copy_base64: copyB64,
+        copy_media_type: copyFile.type,
+        candidate: { first_name: candidate.first_name, last_name: candidate.last_name },
+        job_offer: candidate.job_offer ? { title: candidate.job_offer.title, company: candidate.job_offer.company } : undefined,
+      })
+      const techAnalysisText = [
+        result.note_globale,
+        result.points_reussis ? `Points réussis : ${result.points_reussis}` : '',
+        result.points_ameliorer ? `À améliorer : ${result.points_ameliorer}` : '',
+        result.commentaire ? `Commentaire : ${result.commentaire}` : '',
+      ].filter(Boolean).join('\n\n')
+      const update = {
+        score_technique: result.score_technique ?? null,
+        technical_analysis: techAnalysisText || null,
+      }
+      await supabase.from('interviews').update(update).eq('id', iv.id)
+      setInterviews(ivs => ivs.map(x => x.id === iv.id ? { ...x, ...update } : x))
+    } catch (err) {
+      alert(`Erreur d'analyse technique : ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setAnalyzingTechTest(null)
     }
   }
 
@@ -1181,6 +1234,108 @@ export function CandidateDetailPage() {
                             </Button>
                           </div>
                         </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Test technique — toggle */}
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setTechTestOpen(prev => {
+                        const next = new Set(prev)
+                        next.has(iv.id) ? next.delete(iv.id) : next.add(iv.id)
+                        return next
+                      })}
+                      className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors text-left"
+                    >
+                      <span className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+                        <ClipboardList size={13} /> Test technique
+                        {iv.score_technique !== null && (
+                          <span className={`ml-2 font-bold ${iv.score_technique >= 14 ? 'text-green-600' : iv.score_technique >= 10 ? 'text-orange-500' : 'text-red-500'}`}>
+                            {iv.score_technique}/20
+                          </span>
+                        )}
+                      </span>
+                      {techTestOpen.has(iv.id) ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
+                    </button>
+
+                    {techTestOpen.has(iv.id) && (
+                      <div className="p-4 space-y-4">
+                        {/* Upload sujet */}
+                        <div>
+                          <p className="text-xs font-medium text-slate-500 mb-1.5">Sujet du test</p>
+                          <label className="flex items-center gap-2 text-xs border border-dashed border-slate-300 rounded-xl px-3 py-2.5 cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all">
+                            <Upload size={13} className="text-slate-400 shrink-0" />
+                            <span className="text-slate-500">
+                              {techSubjectFile[iv.id] ? techSubjectFile[iv.id]!.name : (iv.technical_subject_url ? 'Sujet importé ✓ — remplacer' : 'Importer le sujet (PDF, PNG, JPEG…)')}
+                            </span>
+                            <input
+                              type="file"
+                              accept="image/*,application/pdf"
+                              className="hidden"
+                              onChange={e => { const f = e.target.files?.[0]; if (f) setTechSubjectFile(prev => ({ ...prev, [iv.id]: f })); e.target.value = '' }}
+                            />
+                          </label>
+                        </div>
+
+                        {/* Upload copie candidat */}
+                        <div>
+                          <p className="text-xs font-medium text-slate-500 mb-1.5">Copie du candidat</p>
+                          <label className="flex items-center gap-2 text-xs border border-dashed border-slate-300 rounded-xl px-3 py-2.5 cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all">
+                            <Upload size={13} className="text-slate-400 shrink-0" />
+                            <span className="text-slate-500">
+                              {techCopyFile[iv.id] ? techCopyFile[iv.id]!.name : (iv.technical_copy_url ? 'Copie importée ✓ — remplacer' : 'Importer la copie (PDF, PNG, JPEG…)')}
+                            </span>
+                            <input
+                              type="file"
+                              accept="image/*,application/pdf"
+                              className="hidden"
+                              onChange={e => { const f = e.target.files?.[0]; if (f) setTechCopyFile(prev => ({ ...prev, [iv.id]: f })); e.target.value = '' }}
+                            />
+                          </label>
+                        </div>
+
+                        {/* Bouton analyse */}
+                        <Button
+                          size="sm"
+                          onClick={() => handleTechTestAnalysis(iv)}
+                          loading={analyzingTechTest === iv.id}
+                          disabled={analyzingTechTest !== null || !techSubjectFile[iv.id] || !techCopyFile[iv.id]}
+                        >
+                          <Wand2 size={13} /> {iv.score_technique !== null ? 'Ré-noter le test' : 'Noter le test avec l\'IA'}
+                        </Button>
+                        {!techSubjectFile[iv.id] || !techCopyFile[iv.id] ? (
+                          <p className="text-xs text-slate-400">Importez le sujet et la copie pour activer la notation.</p>
+                        ) : null}
+
+                        {/* Résultats du test technique */}
+                        {iv.score_technique !== null && (
+                          <div className="bg-slate-50 rounded-xl p-3 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-2xl font-bold ${iv.score_technique >= 14 ? 'text-green-600' : iv.score_technique >= 10 ? 'text-orange-500' : 'text-red-500'}`}>
+                                {iv.score_technique}
+                              </span>
+                              <span className="text-slate-400 text-sm font-medium">/20</span>
+                              <span className={`text-xs font-semibold px-2 py-0.5 rounded-lg ml-1 ${
+                                iv.score_technique >= 14 ? 'bg-green-100 text-green-700' :
+                                iv.score_technique >= 10 ? 'bg-orange-100 text-orange-700' :
+                                'bg-red-100 text-red-700'
+                              }`}>
+                                {iv.score_technique >= 14 ? 'Très bien' : iv.score_technique >= 10 ? 'Passable' : 'Insuffisant'}
+                              </span>
+                            </div>
+                            <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all ${iv.score_technique >= 14 ? 'bg-green-500' : iv.score_technique >= 10 ? 'bg-orange-400' : 'bg-red-500'}`}
+                                style={{ width: `${(iv.score_technique / 20) * 100}%` }}
+                              />
+                            </div>
+                            {iv.technical_analysis && (
+                              <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap pt-1">{iv.technical_analysis}</p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

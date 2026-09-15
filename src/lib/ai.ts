@@ -87,6 +87,25 @@ export async function generateInterviewQuestions(params: {
   return data as { questions: { question: string; category: string; tip: string }[] }
 }
 
+export async function analyzeTechnicalTest(params: {
+  subject_base64: string
+  subject_media_type: string
+  copy_base64: string
+  copy_media_type: string
+  candidate?: { first_name: string; last_name: string }
+  job_offer?: { title: string; company: string }
+}) {
+  const { data, error } = await supabase.functions.invoke('analyze-technical-test', { body: params })
+  if (error) throw error
+  return data as {
+    score_technique: number
+    note_globale: string
+    points_reussis: string
+    points_ameliorer: string
+    commentaire: string
+  }
+}
+
 export async function generateMessage(params: {
   type: 'interview_invitation' | 'shortlist' | 'rejection' | 'offer' | 'hired'
   candidate?: { first_name: string; last_name: string }
