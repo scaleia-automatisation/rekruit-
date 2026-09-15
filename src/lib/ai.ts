@@ -30,6 +30,7 @@ export async function analyzeCandidate(params: {
 
 export async function analyzeInterview(params: {
   transcript?: string
+  transcript_labelled?: string
   recruiter_notes?: string
   candidate?: { first_name: string; last_name: string }
   job_offer?: { title: string; company: string }
@@ -37,10 +38,23 @@ export async function analyzeInterview(params: {
 }) {
   const { data, error } = await supabase.functions.invoke('analyze-interview', { body: params })
   if (error) throw error
-  return data
+  return data as {
+    score: number
+    score_communication: number
+    score_motivation: number
+    score_competences: number
+    score_pertinence: number
+    score_coherence: number
+    score_questions_candidat: number | null
+    strengths: string
+    concerns: string
+    summary: string
+    recommendation: string
+    next_step: string
+  }
 }
 
-export async function transcribeAudio(file: File): Promise<{ transcript: string }> {
+export async function transcribeAudio(file: File): Promise<{ transcript: string; transcript_labelled: string }> {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session?.access_token) throw new Error('Non authentifié')
   const form = new FormData()

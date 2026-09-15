@@ -75,11 +75,13 @@ interface Interview {
   questions: InterviewQuestion[] | null
   recruiter_notes: string | null
   audio_transcript: string | null
+  transcript_labelled: string | null
   score_communication: number | null
   score_motivation: number | null
   score_competences: number | null
   score_pertinence: number | null
   score_coherence: number | null
+  score_questions_candidat: number | null
   ai_strengths: string | null
   ai_concerns: string | null
   slots?: { id: string; slot_datetime: string | null; label: string | null; status: string | null }[]
@@ -382,10 +384,10 @@ export function CandidateDetailPage() {
   const handleAudioUpload = async (iv: Interview, file: File) => {
     setTranscribingAudio(iv.id)
     try {
-      const { transcript } = await transcribeAudio(file)
+      const { transcript, transcript_labelled } = await transcribeAudio(file)
       setAudioTranscripts(prev => ({ ...prev, [iv.id]: transcript }))
-      await supabase.from('interviews').update({ audio_transcript: transcript }).eq('id', iv.id)
-      setInterviews(ivs => ivs.map(x => x.id === iv.id ? { ...x, audio_transcript: transcript } : x))
+      await supabase.from('interviews').update({ audio_transcript: transcript, transcript_labelled: transcript_labelled || null }).eq('id', iv.id)
+      setInterviews(ivs => ivs.map(x => x.id === iv.id ? { ...x, audio_transcript: transcript, transcript_labelled: transcript_labelled || null } : x))
     } catch (err) {
       alert(`Erreur de transcription : ${err instanceof Error ? err.message : String(err)}`)
     } finally {
@@ -401,6 +403,7 @@ export function CandidateDetailPage() {
       const notes = recruiterNotes[iv.id] ?? iv.recruiter_notes ?? undefined
       const result = await analyzeInterview({
         transcript: transcript || undefined,
+        transcript_labelled: iv.transcript_labelled || undefined,
         recruiter_notes: notes || undefined,
         candidate: { first_name: candidate.first_name, last_name: candidate.last_name },
         job_offer: candidate.job_offer ? { title: candidate.job_offer.title, company: candidate.job_offer.company } : undefined,
@@ -415,6 +418,7 @@ export function CandidateDetailPage() {
         score_competences: result.score_competences ?? null,
         score_pertinence: result.score_pertinence ?? null,
         score_coherence: result.score_coherence ?? null,
+        score_questions_candidat: result.score_questions_candidat ?? null,
         ai_strengths: result.strengths ?? null,
         ai_concerns: result.concerns ?? null,
       }
@@ -1138,27 +1142,44 @@ export function CandidateDetailPage() {
                     {transcribingAudio === iv.id && (
                       <div className="flex items-center gap-2 text-sm text-slate-500 py-3">
                         <Loader2 size={15} className="animate-spin text-blue-500" />
-                        Transcription en cours via Whisper AI...
+                        Transcription et identification des interlocuteurs en cours...
                       </div>
                     )}
                     {(audioTranscripts[iv.id] !== undefined || iv.audio_transcript) && transcribingAudio !== iv.id && (
-                      <div>
-                        <textarea
-                          value={audioTranscripts[iv.id] !== undefined ? audioTranscripts[iv.id] : (iv.audio_transcript ?? '')}
-                          onChange={e => setAudioTranscripts(prev => ({ ...prev, [iv.id]: e.target.value }))}
-                          placeholder="Transcript de l'entretien..."
-                          rows={7}
-                          className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600 resize-y font-mono leading-relaxed"
-                        />
-                        <div className="flex items-center gap-2 mt-1.5">
-                          {transcriptSavedId === iv.id && (
-                            <span className="text-xs text-green-600 font-medium flex items-center gap-1">
-                              <CheckCircle size={12} /> Enregistré
-                            </span>
+                      <div className="space-y-3">
+                        {/* Transcript labellisé (RECRUTEUR / CANDIDAT) — lecture seule */}
+                        {iv.transcript_labelled && (
+                          <div>
+                            <p className="text-xs font-semibold text-indigo-600 mb-1.5 flex items-center gap-1.5">
+                              <Users size={12} /> Transcript avec identification des interlocuteurs
+                            </p>
+                            <div className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono leading-relaxed max-h-48 overflow-y-auto whitespace-pre-wrap text-slate-700">
+                              {iv.transcript_labelled}
+                            </div>
+                          </div>
+                        )}
+                        {/* Transcript brut éditable */}
+                        <div>
+                          {iv.transcript_labelled && (
+                            <p className="text-xs text-slate-400 mb-1">Transcript brut (modifiable)</p>
                           )}
-                          <Button size="sm" variant="secondary" loading={savingTranscript === iv.id} onClick={() => saveTranscript(iv.id)}>
-                            <Save size={12} /> Enregistrer le transcript
-                          </Button>
+                          <textarea
+                            value={audioTranscripts[iv.id] !== undefined ? audioTranscripts[iv.id] : (iv.audio_transcript ?? '')}
+                            onChange={e => setAudioTranscripts(prev => ({ ...prev, [iv.id]: e.target.value }))}
+                            placeholder="Transcript de l'entretien..."
+                            rows={iv.transcript_labelled ? 4 : 7}
+                            className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600 resize-y font-mono leading-relaxed"
+                          />
+                          <div className="flex items-center gap-2 mt-1.5">
+                            {transcriptSavedId === iv.id && (
+                              <span className="text-xs text-green-600 font-medium flex items-center gap-1">
+                                <CheckCircle size={12} /> Enregistré
+                              </span>
+                            )}
+                            <Button size="sm" variant="secondary" loading={savingTranscript === iv.id} onClick={() => saveTranscript(iv.id)}>
+                              <Save size={12} /> Enregistrer le transcript
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -1208,6 +1229,7 @@ export function CandidateDetailPage() {
                             { key: 'score_competences', label: 'Compétences', color: 'bg-green-500' },
                             { key: 'score_pertinence', label: 'Pertinence des réponses', color: 'bg-orange-500' },
                             { key: 'score_coherence', label: 'Cohérence du parcours', color: 'bg-teal-500' },
+                            { key: 'score_questions_candidat', label: 'Questions posées par le candidat', color: 'bg-indigo-500' },
                           ] as const).map(({ key, label, color }) => {
                             const val = iv[key]
                             if (!val) return null
