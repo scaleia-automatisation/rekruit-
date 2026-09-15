@@ -172,7 +172,7 @@ export function CandidateDetailPage() {
   const [transcribingAudio, setTranscribingAudio] = useState<string | null>(null)
   const [analyzingInterview, setAnalyzingInterview] = useState<string | null>(null)
 
-  // Post-decision email modal
+  // Post-decision email modal (hired / rejection from interview)
   const [postDecisionModal, setPostDecisionModal] = useState<{
     type: 'hired' | 'rejection'
     interviewId: string
@@ -183,6 +183,17 @@ export function CandidateDetailPage() {
   const [genPostMsg, setGenPostMsg] = useState(false)
   const [sendingPostMsg, setSendingPostMsg] = useState(false)
   const [postMsgSent, setPostMsgSent] = useState(false)
+
+  // Status email modal (shortlist / offer from pipeline actions)
+  const [statusEmailModal, setStatusEmailModal] = useState<{
+    type: 'shortlist' | 'offer'
+    targetStatus: 'shortlisted' | 'offer'
+  } | null>(null)
+  const [statusMsgSubject, setStatusMsgSubject] = useState('')
+  const [statusMsgBody, setStatusMsgBody] = useState('')
+  const [genStatusMsg, setGenStatusMsg] = useState(false)
+  const [sendingStatusMsg, setSendingStatusMsg] = useState(false)
+  const [statusMsgSent, setStatusMsgSent] = useState(false)
 
   const loadHistory = async () => {
     if (!candidate) return
@@ -483,6 +494,68 @@ export function CandidateDetailPage() {
     setSendingPostMsg(false)
   }
 
+  const openStatusEmailModal = async (type: 'shortlist' | 'offer', targetStatus: 'shortlisted' | 'offer') => {
+    if (!candidate) return
+    setStatusEmailModal({ type, targetStatus })
+    setStatusMsgSubject('')
+    setStatusMsgBody('')
+    setStatusMsgSent(false)
+    setGenStatusMsg(true)
+    try {
+      const msgType = type === 'shortlist' ? 'shortlist' : 'offer'
+      const result = await generateMessage({
+        type: msgType,
+        candidate: { first_name: candidate.first_name, last_name: candidate.last_name },
+        job_offer: candidate.job_offer ? { title: candidate.job_offer.title, company: candidate.job_offer.company } : undefined,
+      })
+      setStatusMsgSubject(result.subject)
+      setStatusMsgBody(result.message)
+    } finally {
+      setGenStatusMsg(false)
+    }
+  }
+
+  const sendStatusMsg = async () => {
+    if (!candidate?.email || !statusMsgBody || !statusEmailModal) return
+    const orgId = profile?.organization_id
+    if (!orgId) return
+    setSendingStatusMsg(true)
+    const emailRes = await fetch(`${SUPABASE_URL}/functions/v1/send-interview-invitation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({
+        to: candidate.email,
+        subject: statusMsgSubject,
+        body: statusMsgBody,
+        token_url: null,
+        slots_data: [],
+        from_name: candidate.job_offer?.company,
+        reply_to: user?.email,
+      }),
+    })
+    if (emailRes.ok) {
+      await supabase.from('messages').insert({
+        candidate_id: candidate.id,
+        organization_id: orgId,
+        type: 'email',
+        subject: statusMsgSubject,
+        content: statusMsgBody,
+        channel: 'outbound',
+        status: 'sent',
+        sent_at: new Date().toISOString(),
+      })
+      await updateStatus(statusEmailModal.targetStatus)
+      setEmailToast(candidate.email)
+      setTimeout(() => setEmailToast(null), 4000)
+      setStatusMsgSent(true)
+      setTimeout(() => { setStatusMsgSent(false); setStatusEmailModal(null) }, 3000)
+    } else {
+      const err = await emailRes.json().catch(() => ({}))
+      alert(`Erreur d'envoi : ${err.error || emailRes.statusText}`)
+    }
+    setSendingStatusMsg(false)
+  }
+
   const generateMsg = async () => {
     if (!candidate?.job_offer || slots.length === 0) return
     setGenMsg(true)
@@ -727,9 +800,19 @@ export function CandidateDetailPage() {
           <Button size="sm" variant="secondary" onClick={() => updateStatus('rejected')} disabled={statusLoading || candidate.status === 'rejected'}>
             <XCircle size={15} className="text-red-500" /> Refuser
           </Button>
-          <Button size="sm" variant="secondary" onClick={() => updateStatus('shortlisted')} disabled={statusLoading || candidate.status === 'shortlisted'}>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => candidate.email ? openStatusEmailModal('shortlist', 'shortlisted') : updateStatus('shortlisted')}
+            disabled={statusLoading || candidate.status === 'shortlisted'}
+          >
             <CheckCircle size={15} className="text-green-500" /> Retenir
           </Button>
+          {(candidate.status === 'interview_1' || candidate.status === 'interview_2' || candidate.status === 'interview_3') && (
+            <Button size="sm" variant="secondary" onClick={() => candidate.email ? openStatusEmailModal('offer', 'offer') : updateStatus('offer')} disabled={statusLoading}>
+              <MailCheck size={15} className="text-blue-500" /> Proposer une offre
+            </Button>
+          )}
           {interviews.length < interviewRounds && (
             <Button size="sm" onClick={() => openSchedule((interviews.length + 1) as 1 | 2 | 3)} disabled={statusLoading}>
               <CalendarPlus size={15} /> Planifier entretien {interviews.length + 1}
@@ -1338,6 +1421,94 @@ export function CandidateDetailPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Status email modal (shortlist / offer) */}
+      {statusEmailModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-slate-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="font-bold text-slate-900">
+                    {statusEmailModal.type === 'shortlist' ? '✅ Email de présélection' : '📄 Email d\'offre d\'emploi'}
+                  </h2>
+                  <p className="text-sm text-slate-500 mt-0.5">
+                    {statusEmailModal.type === 'shortlist'
+                      ? 'Informez le candidat que sa candidature est retenue'
+                      : 'Proposez officiellement le poste au candidat'}
+                  </p>
+                </div>
+                <button onClick={() => setStatusEmailModal(null)} className="text-slate-400 hover:text-slate-600">
+                  <XCircle size={20} />
+                </button>
+              </div>
+            </div>
+            <div className="p-6 space-y-4">
+              {genStatusMsg ? (
+                <div className="flex items-center justify-center py-8 gap-3 text-slate-500">
+                  <Loader2 size={20} className="animate-spin" />
+                  <span className="text-sm">Génération du message...</span>
+                </div>
+              ) : statusMsgSent ? (
+                <div className="text-center py-8">
+                  <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <MailCheck size={26} className="text-green-600" />
+                  </div>
+                  <p className="font-semibold text-green-900 mb-1">Email envoyé !</p>
+                  <p className="text-sm text-green-700">Message envoyé à <strong>{candidate?.email}</strong></p>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Objet</label>
+                    <input
+                      value={statusMsgSubject}
+                      onChange={e => setStatusMsgSubject(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide">Message</label>
+                      <button
+                        onClick={() => { if (statusEmailModal) openStatusEmailModal(statusEmailModal.type, statusEmailModal.targetStatus) }}
+                        className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                      >
+                        <Wand2 size={12} /> Regénérer
+                      </button>
+                    </div>
+                    <textarea
+                      value={statusMsgBody}
+                      onChange={e => setStatusMsgBody(e.target.value)}
+                      rows={10}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-600 resize-y"
+                    />
+                  </div>
+                  <div className="flex gap-3 pt-1">
+                    <Button
+                      onClick={sendStatusMsg}
+                      loading={sendingStatusMsg}
+                      disabled={!statusMsgBody || !candidate?.email}
+                      className={statusEmailModal.type === 'offer' ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}
+                    >
+                      <Send size={15} /> Envoyer
+                    </Button>
+                    <Button variant="secondary" onClick={() => {
+                      updateStatus(statusEmailModal.targetStatus)
+                      setStatusEmailModal(null)
+                    }}>
+                      Enregistrer sans email
+                    </Button>
+                  </div>
+                  {!candidate?.email && (
+                    <p className="text-xs text-amber-600">Ce candidat n'a pas d'adresse email renseignée.</p>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
