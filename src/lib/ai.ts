@@ -29,7 +29,8 @@ export async function analyzeCandidate(params: {
 }
 
 export async function analyzeInterview(params: {
-  transcript: string
+  transcript?: string
+  recruiter_notes?: string
   candidate?: { first_name: string; last_name: string }
   job_offer?: { title: string; company: string }
   interview_number?: number
@@ -37,6 +38,23 @@ export async function analyzeInterview(params: {
   const { data, error } = await supabase.functions.invoke('analyze-interview', { body: params })
   if (error) throw error
   return data
+}
+
+export async function transcribeAudio(file: File): Promise<{ transcript: string }> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) throw new Error('Non authentifié')
+  const form = new FormData()
+  form.append('file', file, file.name)
+  const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/transcribe-audio`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${session.access_token}` },
+    body: form,
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error || 'Erreur de transcription audio')
+  }
+  return res.json()
 }
 
 export async function generateInterviewQuestions(params: {
@@ -56,7 +74,7 @@ export async function generateInterviewQuestions(params: {
 }
 
 export async function generateMessage(params: {
-  type: 'interview_invitation' | 'shortlist' | 'rejection' | 'offer'
+  type: 'interview_invitation' | 'shortlist' | 'rejection' | 'offer' | 'hired'
   candidate?: { first_name: string; last_name: string }
   job_offer?: { title: string; company: string }
   slots?: { label: string }[]

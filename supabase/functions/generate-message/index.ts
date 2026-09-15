@@ -52,7 +52,9 @@ ${interviewersLine ? `- Mentionne avec qui le candidat aura l'entretien (${inter
 
       shortlist: `Rédige un email pour informer ${candidate?.first_name} ${candidate?.last_name} que sa candidature pour le poste de ${job_offer?.title} chez ${job_offer?.company} a été présélectionnée. Message court et encourageant.`,
 
-      rejection: `Rédige un email de refus bienveillant et professionnel pour ${candidate?.first_name} ${candidate?.last_name} concernant sa candidature pour le poste de ${job_offer?.title} chez ${job_offer?.company}. Message court, respectueux, qui encourage le candidat.`,
+      rejection: `Rédige un email de refus bienveillant et professionnel pour ${candidate?.first_name} ${candidate?.last_name} concernant sa candidature pour le poste de ${job_offer?.title} chez ${job_offer?.company}. Message court, respectueux, qui encourage le candidat pour la suite de ses recherches et lui souhaite bonne chance.`,
+
+      hired: `Rédige un email chaleureux et professionnel pour féliciter ${candidate?.first_name} ${candidate?.last_name} et lui annoncer qu'il/elle a été retenu(e) pour le poste de ${job_offer?.title} chez ${job_offer?.company}. Exprime l'enthousiasme de l'équipe à l'idée de l'accueillir, et indique que l'équipe RH le/la contactera prochainement pour les prochaines étapes (contrat, date de démarrage). Message chaleureux, motivant et professionnel.`,
 
       offer: `Rédige un email pour proposer une offre d'emploi à ${candidate?.first_name} ${candidate?.last_name} pour le poste de ${job_offer?.title} chez ${job_offer?.company}. Message chaleureux et professionnel.`,
     }
@@ -82,6 +84,7 @@ ${interviewersLine ? `- Mentionne avec qui le candidat aura l'entretien (${inter
       interview_invitation: `Invitation à un entretien - ${job_offer?.title}`,
       shortlist: `Votre candidature a été présélectionnée - ${job_offer?.title}`,
       rejection: `Suite à votre candidature - ${job_offer?.title}`,
+      hired: `Félicitations - Offre d'emploi acceptée - ${job_offer?.title}`,
       offer: `Offre d'emploi - ${job_offer?.title}`,
     }
 

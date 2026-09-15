@@ -4,10 +4,10 @@ import { useAuth } from '../contexts/AuthContext'
 import {
   ArrowLeft, Mail, Phone, MapPin, Star, CheckCircle, XCircle, CalendarPlus, Trash2,
   Wand2, Loader2, Send, Upload, Save, MailCheck, History, MessageSquare, UserCheck, CheckSquare,
-  Users, ChevronDown, ChevronUp, ClipboardList
+  Users, ChevronDown, ChevronUp, ClipboardList, Mic
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { generateMessage, generateInterviewQuestions } from '../lib/ai'
+import { generateMessage, generateInterviewQuestions, analyzeInterview, transcribeAudio } from '../lib/ai'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -73,6 +73,8 @@ interface Interview {
   interview_duration: number | null
   interviewers: OrgMember[] | null
   questions: InterviewQuestion[] | null
+  recruiter_notes: string | null
+  audio_transcript: string | null
   slots?: { id: string; slot_datetime: string | null; label: string | null; status: string | null }[]
 }
 
@@ -152,6 +154,25 @@ export function CandidateDetailPage() {
   // Questionnaire state
   const [generatingQuestions, setGeneratingQuestions] = useState<string | null>(null)
   const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set())
+
+  // Post-interview state
+  const [recruiterNotes, setRecruiterNotes] = useState<Record<string, string>>({})
+  const [savingNotes, setSavingNotes] = useState<string | null>(null)
+  const [audioTranscripts, setAudioTranscripts] = useState<Record<string, string>>({})
+  const [transcribingAudio, setTranscribingAudio] = useState<string | null>(null)
+  const [analyzingInterview, setAnalyzingInterview] = useState<string | null>(null)
+
+  // Post-decision email modal
+  const [postDecisionModal, setPostDecisionModal] = useState<{
+    type: 'hired' | 'rejection'
+    interviewId: string
+    interviewNumber: number
+  } | null>(null)
+  const [postMsgSubject, setPostMsgSubject] = useState('')
+  const [postMsgBody, setPostMsgBody] = useState('')
+  const [genPostMsg, setGenPostMsg] = useState(false)
+  const [sendingPostMsg, setSendingPostMsg] = useState(false)
+  const [postMsgSent, setPostMsgSent] = useState(false)
 
   const loadHistory = async () => {
     if (!candidate) return
@@ -315,6 +336,122 @@ export function CandidateDetailPage() {
     } finally {
       setGeneratingQuestions(null)
     }
+  }
+
+  const saveNotes = async (ivId: string) => {
+    setSavingNotes(ivId)
+    const notes = recruiterNotes[ivId] ?? ''
+    await supabase.from('interviews').update({ recruiter_notes: notes || null }).eq('id', ivId)
+    setInterviews(ivs => ivs.map(x => x.id === ivId ? { ...x, recruiter_notes: notes || null } : x))
+    setSavingNotes(null)
+  }
+
+  const handleAudioUpload = async (iv: Interview, file: File) => {
+    setTranscribingAudio(iv.id)
+    try {
+      const { transcript } = await transcribeAudio(file)
+      setAudioTranscripts(prev => ({ ...prev, [iv.id]: transcript }))
+      await supabase.from('interviews').update({ audio_transcript: transcript }).eq('id', iv.id)
+      setInterviews(ivs => ivs.map(x => x.id === iv.id ? { ...x, audio_transcript: transcript } : x))
+    } catch (err) {
+      alert(`Erreur de transcription : ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setTranscribingAudio(null)
+    }
+  }
+
+  const analyzeInterviewWithAI = async (iv: Interview) => {
+    if (!candidate) return
+    setAnalyzingInterview(iv.id)
+    try {
+      const transcript = audioTranscripts[iv.id] ?? iv.audio_transcript ?? undefined
+      const notes = recruiterNotes[iv.id] ?? iv.recruiter_notes ?? undefined
+      const result = await analyzeInterview({
+        transcript: transcript || undefined,
+        recruiter_notes: notes || undefined,
+        candidate: { first_name: candidate.first_name, last_name: candidate.last_name },
+        job_offer: candidate.job_offer ? { title: candidate.job_offer.title, company: candidate.job_offer.company } : undefined,
+        interview_number: iv.interview_number,
+      })
+      const update = {
+        score: result.score ?? null,
+        ai_summary: result.summary ?? null,
+        recommendation: result.recommendation ?? null,
+      }
+      await supabase.from('interviews').update(update).eq('id', iv.id)
+      setInterviews(ivs => ivs.map(x => x.id === iv.id ? { ...x, ...update } : x))
+    } catch (err) {
+      alert(`Erreur d'analyse : ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setAnalyzingInterview(null)
+    }
+  }
+
+  const saveDecision = async (iv: Interview, decision: 'GO' | 'MAYBE' | 'NO') => {
+    await supabase.from('interviews').update({ recommendation: decision }).eq('id', iv.id)
+    setInterviews(ivs => ivs.map(x => x.id === iv.id ? { ...x, recommendation: decision } : x))
+  }
+
+  const openPostDecisionModal = async (iv: Interview, type: 'hired' | 'rejection') => {
+    if (!candidate) return
+    setPostDecisionModal({ type, interviewId: iv.id, interviewNumber: iv.interview_number })
+    setPostMsgSubject('')
+    setPostMsgBody('')
+    setPostMsgSent(false)
+    setGenPostMsg(true)
+    try {
+      const result = await generateMessage({
+        type,
+        candidate: { first_name: candidate.first_name, last_name: candidate.last_name },
+        job_offer: candidate.job_offer ? { title: candidate.job_offer.title, company: candidate.job_offer.company } : undefined,
+      })
+      setPostMsgSubject(result.subject)
+      setPostMsgBody(result.message)
+    } finally {
+      setGenPostMsg(false)
+    }
+  }
+
+  const sendPostMsg = async () => {
+    if (!candidate?.email || !postMsgBody || !postDecisionModal) return
+    const orgId = profile?.organization_id
+    if (!orgId) return
+    setSendingPostMsg(true)
+    const emailRes = await fetch(`${SUPABASE_URL}/functions/v1/send-interview-invitation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+      body: JSON.stringify({
+        to: candidate.email,
+        subject: postMsgSubject,
+        body: postMsgBody,
+        token_url: null,
+        slots_data: [],
+        from_name: candidate.job_offer?.company,
+        reply_to: user?.email,
+      }),
+    })
+    if (emailRes.ok) {
+      await supabase.from('messages').insert({
+        candidate_id: candidate.id,
+        organization_id: orgId,
+        type: 'email',
+        subject: postMsgSubject,
+        content: postMsgBody,
+        channel: 'outbound',
+        status: 'sent',
+        sent_at: new Date().toISOString(),
+      })
+      if (postDecisionModal.type === 'hired') await updateStatus('hired')
+      else await updateStatus('rejected')
+      setEmailToast(candidate.email)
+      setTimeout(() => setEmailToast(null), 4000)
+      setPostMsgSent(true)
+      setTimeout(() => { setPostMsgSent(false); setPostDecisionModal(null) }, 3000)
+    } else {
+      const err = await emailRes.json().catch(() => ({}))
+      alert(`Erreur d'envoi : ${err.error || emailRes.statusText}`)
+    }
+    setSendingPostMsg(false)
   }
 
   const generateMsg = async () => {
@@ -751,17 +888,6 @@ export function CandidateDetailPage() {
                     ))}
                   </div>
                 )}
-                {iv.score !== null && (
-                  <div className="flex items-center gap-4">
-                    <ScoreDisplay score={iv.score} label="Score entretien" size="sm" />
-                    {iv.recommendation && (
-                      <span className={`font-bold text-sm ${iv.recommendation === 'GO' ? 'text-green-600' : iv.recommendation === 'MAYBE' ? 'text-orange-500' : 'text-red-500'}`}>
-                        {iv.recommendation}
-                      </span>
-                    )}
-                  </div>
-                )}
-                {iv.ai_summary && <p className="text-sm text-slate-600 mt-3">{iv.ai_summary}</p>}
                 {/* Interviewers badge */}
                 {iv.interviewers && iv.interviewers.length > 0 && (
                   <div className="flex items-center gap-2 mt-2 flex-wrap">
@@ -845,13 +971,138 @@ export function CandidateDetailPage() {
                   </div>
                 )}
 
-                {iv.status === 'scheduled' && (
-                  <div className="mt-3 pt-3 border-t border-slate-100">
-                    <Button size="sm" variant="secondary" onClick={() => markInterviewDone(iv.id)}>
-                      <CheckSquare size={14} className="text-green-600" /> Marquer comme terminé
+                {/* Post-interview section */}
+                <div className="mt-3 pt-3 border-t border-slate-100 space-y-4">
+                  {/* Notes du recruteur */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                        <MessageSquare size={13} /> Notes du recruteur
+                      </span>
+                      <Button size="sm" variant="secondary" loading={savingNotes === iv.id} onClick={() => saveNotes(iv.id)}>
+                        <Save size={12} /> Enregistrer
+                      </Button>
+                    </div>
+                    <textarea
+                      value={recruiterNotes[iv.id] !== undefined ? recruiterNotes[iv.id] : (iv.recruiter_notes ?? '')}
+                      onChange={e => setRecruiterNotes(prev => ({ ...prev, [iv.id]: e.target.value }))}
+                      placeholder="Notez vos observations durant l'entretien..."
+                      rows={3}
+                      className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600 resize-y"
+                    />
+                  </div>
+
+                  {/* Audio upload & transcript */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                        <Mic size={13} /> Transcription audio
+                      </span>
+                      <label className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 cursor-pointer hover:border-blue-300 transition-all ${transcribingAudio === iv.id ? 'opacity-50 pointer-events-none' : ''}`}>
+                        {transcribingAudio === iv.id ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                        {transcribingAudio === iv.id ? 'Transcription...' : 'Importer audio'}
+                        <input type="file" accept="audio/*,video/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleAudioUpload(iv, f); e.target.value = '' }} />
+                      </label>
+                    </div>
+                    {(audioTranscripts[iv.id] !== undefined || iv.audio_transcript) && (
+                      <textarea
+                        value={audioTranscripts[iv.id] !== undefined ? audioTranscripts[iv.id] : (iv.audio_transcript ?? '')}
+                        onChange={e => setAudioTranscripts(prev => ({ ...prev, [iv.id]: e.target.value }))}
+                        placeholder="Transcript de l'entretien..."
+                        rows={6}
+                        className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600 resize-y font-mono leading-relaxed"
+                      />
+                    )}
+                  </div>
+
+                  {/* Analyser avec l'IA */}
+                  <div>
+                    <Button
+                      size="sm"
+                      onClick={() => analyzeInterviewWithAI(iv)}
+                      loading={analyzingInterview === iv.id}
+                      disabled={analyzingInterview !== null || (
+                        !(audioTranscripts[iv.id] || iv.audio_transcript) &&
+                        !(recruiterNotes[iv.id] || iv.recruiter_notes)
+                      )}
+                    >
+                      <Wand2 size={14} /> Analyser l'entretien avec l'IA
                     </Button>
                   </div>
-                )}
+
+                  {/* Score IA + résumé */}
+                  {iv.score !== null && (
+                    <div className="bg-slate-50 rounded-xl p-4 space-y-2">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <ScoreDisplay score={iv.score} label="Score" size="sm" />
+                        {iv.recommendation && (
+                          <span className={`text-xs font-bold px-3 py-1.5 rounded-lg ${
+                            iv.recommendation === 'GO' ? 'bg-green-100 text-green-700' :
+                            iv.recommendation === 'MAYBE' ? 'bg-orange-100 text-orange-700' :
+                            'bg-red-100 text-red-700'
+                          }`}>
+                            {iv.recommendation === 'GO' ? '🟢' : iv.recommendation === 'MAYBE' ? '🟡' : '🔴'} Avis IA : {iv.recommendation}
+                          </span>
+                        )}
+                      </div>
+                      {iv.ai_summary && <p className="text-sm text-slate-600 leading-relaxed">{iv.ai_summary}</p>}
+                    </div>
+                  )}
+
+                  {/* GO / MAYBE / NO — décision recruteur */}
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Décision du recruteur</p>
+                    <div className="flex gap-2">
+                      {(['GO', 'MAYBE', 'NO'] as const).map(d => (
+                        <button
+                          key={d}
+                          onClick={() => saveDecision(iv, d)}
+                          className={`flex-1 py-2 rounded-xl text-sm font-bold border-2 transition-all ${
+                            iv.recommendation === d
+                              ? d === 'GO' ? 'bg-green-600 text-white border-green-600'
+                                : d === 'MAYBE' ? 'bg-orange-500 text-white border-orange-500'
+                                : 'bg-red-600 text-white border-red-600'
+                              : d === 'GO' ? 'border-green-200 text-green-700 hover:bg-green-50'
+                                : d === 'MAYBE' ? 'border-orange-200 text-orange-700 hover:bg-orange-50'
+                                : 'border-red-200 text-red-700 hover:bg-red-50'
+                          }`}
+                        >
+                          {d === 'GO' ? '🟢' : d === 'MAYBE' ? '🟡' : '🔴'} {d}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Actions post-décision */}
+                  {iv.recommendation === 'GO' && iv.interview_number < interviewRounds && (
+                    <Button size="sm" onClick={() => openSchedule((iv.interview_number + 1) as 1 | 2 | 3)}>
+                      <CalendarPlus size={14} /> Planifier entretien {iv.interview_number + 1}
+                    </Button>
+                  )}
+                  {iv.recommendation === 'MAYBE' && iv.interview_number < interviewRounds && (
+                    <Button size="sm" variant="secondary" onClick={() => openSchedule((iv.interview_number + 1) as 1 | 2 | 3)}>
+                      <CalendarPlus size={14} /> Planifier entretien {iv.interview_number + 1}
+                    </Button>
+                  )}
+                  {iv.recommendation === 'GO' && iv.interview_number >= interviewRounds && (
+                    <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => openPostDecisionModal(iv, 'hired')}>
+                      <MailCheck size={14} /> Envoyer email d'embauche
+                    </Button>
+                  )}
+                  {iv.recommendation === 'NO' && (
+                    <Button size="sm" variant="danger" onClick={() => openPostDecisionModal(iv, 'rejection')}>
+                      <Mail size={14} /> Envoyer email de refus
+                    </Button>
+                  )}
+
+                  {iv.status === 'scheduled' && (
+                    <div className="pt-1">
+                      <Button size="sm" variant="secondary" onClick={() => markInterviewDone(iv.id)}>
+                        <CheckSquare size={14} className="text-green-600" /> Marquer comme terminé
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </Card>
             ))
           )}
@@ -957,6 +1208,85 @@ export function CandidateDetailPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Post-decision email modal */}
+      {postDecisionModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-slate-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="font-bold text-slate-900">
+                    {postDecisionModal.type === 'hired' ? '🎉 Email d\'embauche' : '📩 Email de refus'}
+                  </h2>
+                  <p className="text-sm text-slate-500 mt-0.5">
+                    {postDecisionModal.type === 'hired'
+                      ? 'Félicitez le candidat pour son recrutement'
+                      : 'Informez le candidat avec bienveillance'}
+                  </p>
+                </div>
+                <button onClick={() => setPostDecisionModal(null)} className="text-slate-400 hover:text-slate-600">
+                  <XCircle size={20} />
+                </button>
+              </div>
+            </div>
+            <div className="p-6 space-y-4">
+              {genPostMsg ? (
+                <div className="flex items-center justify-center py-8 gap-3 text-slate-500">
+                  <Loader2 size={20} className="animate-spin" />
+                  <span className="text-sm">Génération du message...</span>
+                </div>
+              ) : postMsgSent ? (
+                <div className="text-center py-8">
+                  <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <MailCheck size={26} className="text-green-600" />
+                  </div>
+                  <p className="font-semibold text-green-900 mb-1">Email envoyé !</p>
+                  <p className="text-sm text-green-700">Message envoyé à <strong>{candidate?.email}</strong></p>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Objet</label>
+                    <input
+                      value={postMsgSubject}
+                      onChange={e => setPostMsgSubject(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide">Message</label>
+                      <button
+                        onClick={() => { if (postDecisionModal) openPostDecisionModal(interviews.find(x => x.id === postDecisionModal.interviewId)!, postDecisionModal.type) }}
+                        className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                      >
+                        <Wand2 size={12} /> Regénérer
+                      </button>
+                    </div>
+                    <textarea
+                      value={postMsgBody}
+                      onChange={e => setPostMsgBody(e.target.value)}
+                      rows={10}
+                      className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-600 resize-y"
+                    />
+                  </div>
+                  <div className="flex gap-3 pt-1">
+                    <Button onClick={sendPostMsg} loading={sendingPostMsg} disabled={!postMsgBody || !candidate?.email}
+                      className={postDecisionModal.type === 'hired' ? 'bg-green-600 hover:bg-green-700 text-white' : ''}>
+                      <Send size={15} /> Envoyer
+                    </Button>
+                    <Button variant="secondary" onClick={() => setPostDecisionModal(null)}>Annuler</Button>
+                  </div>
+                  {!candidate?.email && (
+                    <p className="text-xs text-amber-600">Ce candidat n'a pas d'adresse email renseignée.</p>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

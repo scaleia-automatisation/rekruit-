@@ -11,7 +11,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { transcript, candidate, job_offer, interview_number } = await req.json()
+    const { transcript, recruiter_notes, candidate, job_offer, interview_number } = await req.json()
     const apiKey = Deno.env.get('OPENAI_API_KEY')
     const model = Deno.env.get('AI_MODEL') || 'gpt-4o'
 
@@ -20,6 +20,18 @@ Deno.serve(async (req: Request) => {
       job_offer ? `Poste: ${job_offer.title} chez ${job_offer.company}` : '',
       interview_number ? `Entretien numéro: ${interview_number}` : '',
     ].filter(Boolean).join('\n')
+
+    const recruiterSection = recruiter_notes?.trim()
+      ? `\nNotes du recruteur:\n${recruiter_notes.trim()}\n`
+      : ''
+
+    const transcriptSection = transcript?.trim()
+      ? `\nTranscript de l'entretien:\n${transcript.trim()}`
+      : ''
+
+    if (!recruiterSection && !transcriptSection) {
+      throw new Error('Au moins un transcript ou des notes recruteur sont nécessaires')
+    }
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -32,12 +44,9 @@ Deno.serve(async (req: Request) => {
         max_tokens: 2000,
         messages: [{
           role: 'user',
-          content: `${context}
+          content: `${context}${recruiterSection}${transcriptSection}
 
-Transcript de l'entretien:
-${transcript}
-
-Analyse cet entretien et réponds UNIQUEMENT avec un JSON valide:
+Analyse cet entretien en tenant compte à la fois du transcript audio ET des notes du recruteur. Réponds UNIQUEMENT avec un JSON valide:
 {
   "score": score global de 0 à 100,
   "score_communication": score communication de 0 à 100,
