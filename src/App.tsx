@@ -17,6 +17,7 @@ import { NewOfferPage } from './pages/NewOfferPage'
 import { OfferDetailPage } from './pages/OfferDetailPage'
 import { CandidatesPage } from './pages/CandidatesPage'
 import { NewCandidatePage } from './pages/NewCandidatePage'
+import { BulkImportPage } from './pages/BulkImportPage'
 import { CandidateDetailPage } from './pages/CandidateDetailPage'
 import { InterviewsPage } from './pages/InterviewsPage'
 import { CalendarPage } from './pages/CalendarPage'
@@ -163,6 +164,16 @@ function AppRoutes() {
           <OnboardingGuard>
             <AppLayout>
               <NewCandidatePage />
+            </AppLayout>
+          </OnboardingGuard>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/candidats/import" element={
+        <ProtectedRoute>
+          <OnboardingGuard>
+            <AppLayout>
+              <BulkImportPage />
             </AppLayout>
           </OnboardingGuard>
         </ProtectedRoute>

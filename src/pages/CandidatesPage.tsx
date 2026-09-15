@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, ChevronRight, Users, Mail, MapPin } from 'lucide-react'
+import { Plus, ChevronRight, Users, Mail, MapPin, Upload } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { Button } from '../components/ui/Button'
@@ -81,12 +81,20 @@ export function CandidatesPage() {
           <h1 className="text-2xl font-bold text-slate-900">Candidats</h1>
           <p className="text-slate-500 mt-1">{candidates.length} candidat{candidates.length !== 1 ? 's' : ''}</p>
         </div>
-        <Link to="/candidats/nouveau">
-          <Button>
-            <Plus size={18} />
-            Ajouter un candidat
-          </Button>
-        </Link>
+        <div className="flex gap-2 flex-wrap">
+          <Link to="/candidats/import">
+            <Button variant="secondary">
+              <Upload size={16} />
+              Import en lot
+            </Button>
+          </Link>
+          <Link to="/candidats/nouveau">
+            <Button>
+              <Plus size={18} />
+              Ajouter un candidat
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {candidates.length > 0 && (
@@ -127,9 +135,14 @@ export function CandidatesPage() {
               : 'L\'IA analysera et scorera chaque candidat automatiquement.'}
           </p>
           {!search && filterStatus === 'all' && (
-            <Link to="/candidats/nouveau">
-              <Button><Plus size={18} /> Ajouter un candidat</Button>
-            </Link>
+            <div className="flex gap-3 justify-center flex-wrap">
+              <Link to="/candidats/import">
+                <Button variant="secondary"><Upload size={16} /> Import en lot</Button>
+              </Link>
+              <Link to="/candidats/nouveau">
+                <Button><Plus size={18} /> Ajouter un candidat</Button>
+              </Link>
+            </div>
           )}
         </div>
       ) : (
