@@ -75,6 +75,13 @@ interface Interview {
   questions: InterviewQuestion[] | null
   recruiter_notes: string | null
   audio_transcript: string | null
+  score_communication: number | null
+  score_motivation: number | null
+  score_competences: number | null
+  score_pertinence: number | null
+  score_coherence: number | null
+  ai_strengths: string | null
+  ai_concerns: string | null
   slots?: { id: string; slot_datetime: string | null; label: string | null; status: string | null }[]
 }
 
@@ -158,7 +165,10 @@ export function CandidateDetailPage() {
   // Post-interview state
   const [recruiterNotes, setRecruiterNotes] = useState<Record<string, string>>({})
   const [savingNotes, setSavingNotes] = useState<string | null>(null)
+  const [notesSavedId, setNotesSavedId] = useState<string | null>(null)
   const [audioTranscripts, setAudioTranscripts] = useState<Record<string, string>>({})
+  const [savingTranscript, setSavingTranscript] = useState<string | null>(null)
+  const [transcriptSavedId, setTranscriptSavedId] = useState<string | null>(null)
   const [transcribingAudio, setTranscribingAudio] = useState<string | null>(null)
   const [analyzingInterview, setAnalyzingInterview] = useState<string | null>(null)
 
@@ -344,6 +354,18 @@ export function CandidateDetailPage() {
     await supabase.from('interviews').update({ recruiter_notes: notes || null }).eq('id', ivId)
     setInterviews(ivs => ivs.map(x => x.id === ivId ? { ...x, recruiter_notes: notes || null } : x))
     setSavingNotes(null)
+    setNotesSavedId(ivId)
+    setTimeout(() => setNotesSavedId(null), 2500)
+  }
+
+  const saveTranscript = async (ivId: string) => {
+    setSavingTranscript(ivId)
+    const transcript = audioTranscripts[ivId] ?? ''
+    await supabase.from('interviews').update({ audio_transcript: transcript || null }).eq('id', ivId)
+    setInterviews(ivs => ivs.map(x => x.id === ivId ? { ...x, audio_transcript: transcript || null } : x))
+    setSavingTranscript(null)
+    setTranscriptSavedId(ivId)
+    setTimeout(() => setTranscriptSavedId(null), 2500)
   }
 
   const handleAudioUpload = async (iv: Interview, file: File) => {
@@ -377,6 +399,13 @@ export function CandidateDetailPage() {
         score: result.score ?? null,
         ai_summary: result.summary ?? null,
         recommendation: result.recommendation ?? null,
+        score_communication: result.score_communication ?? null,
+        score_motivation: result.score_motivation ?? null,
+        score_competences: result.score_competences ?? null,
+        score_pertinence: result.score_pertinence ?? null,
+        score_coherence: result.score_coherence ?? null,
+        ai_strengths: result.strengths ?? null,
+        ai_concerns: result.concerns ?? null,
       }
       await supabase.from('interviews').update(update).eq('id', iv.id)
       setInterviews(ivs => ivs.map(x => x.id === iv.id ? { ...x, ...update } : x))
@@ -972,21 +1001,40 @@ export function CandidateDetailPage() {
                 )}
 
                 {/* Post-interview section */}
-                <div className="mt-3 pt-3 border-t border-slate-100 space-y-4">
+                <div className="mt-3 pt-3 border-t border-slate-100 space-y-5">
+
+                  {/* Marquer terminé — en haut, bien visible */}
+                  {iv.status === 'scheduled' && (
+                    <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                      <CheckSquare size={16} className="text-amber-600 shrink-0" />
+                      <p className="text-sm text-amber-800 flex-1">L'entretien a-t-il eu lieu ?</p>
+                      <Button size="sm" variant="secondary" onClick={() => markInterviewDone(iv.id)}>
+                        Marquer terminé
+                      </Button>
+                    </div>
+                  )}
+
                   {/* Notes du recruteur */}
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
                         <MessageSquare size={13} /> Notes du recruteur
                       </span>
-                      <Button size="sm" variant="secondary" loading={savingNotes === iv.id} onClick={() => saveNotes(iv.id)}>
-                        <Save size={12} /> Enregistrer
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        {notesSavedId === iv.id && (
+                          <span className="text-xs text-green-600 font-medium flex items-center gap-1">
+                            <CheckCircle size={12} /> Enregistrées
+                          </span>
+                        )}
+                        <Button size="sm" variant="secondary" loading={savingNotes === iv.id} onClick={() => saveNotes(iv.id)}>
+                          <Save size={12} /> Enregistrer
+                        </Button>
+                      </div>
                     </div>
                     <textarea
                       value={recruiterNotes[iv.id] !== undefined ? recruiterNotes[iv.id] : (iv.recruiter_notes ?? '')}
                       onChange={e => setRecruiterNotes(prev => ({ ...prev, [iv.id]: e.target.value }))}
-                      placeholder="Notez vos observations durant l'entretien..."
+                      placeholder="Notez vos observations, points forts, doutes... Ces notes alimenteront l'analyse IA."
                       rows={3}
                       className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600 resize-y"
                     />
@@ -1000,18 +1048,36 @@ export function CandidateDetailPage() {
                       </span>
                       <label className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 cursor-pointer hover:border-blue-300 transition-all ${transcribingAudio === iv.id ? 'opacity-50 pointer-events-none' : ''}`}>
                         {transcribingAudio === iv.id ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
-                        {transcribingAudio === iv.id ? 'Transcription...' : 'Importer audio'}
+                        {transcribingAudio === iv.id ? 'Transcription en cours...' : 'Importer audio'}
                         <input type="file" accept="audio/*,video/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleAudioUpload(iv, f); e.target.value = '' }} />
                       </label>
                     </div>
-                    {(audioTranscripts[iv.id] !== undefined || iv.audio_transcript) && (
-                      <textarea
-                        value={audioTranscripts[iv.id] !== undefined ? audioTranscripts[iv.id] : (iv.audio_transcript ?? '')}
-                        onChange={e => setAudioTranscripts(prev => ({ ...prev, [iv.id]: e.target.value }))}
-                        placeholder="Transcript de l'entretien..."
-                        rows={6}
-                        className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600 resize-y font-mono leading-relaxed"
-                      />
+                    {transcribingAudio === iv.id && (
+                      <div className="flex items-center gap-2 text-sm text-slate-500 py-3">
+                        <Loader2 size={15} className="animate-spin text-blue-500" />
+                        Transcription en cours via Whisper AI...
+                      </div>
+                    )}
+                    {(audioTranscripts[iv.id] !== undefined || iv.audio_transcript) && transcribingAudio !== iv.id && (
+                      <div>
+                        <textarea
+                          value={audioTranscripts[iv.id] !== undefined ? audioTranscripts[iv.id] : (iv.audio_transcript ?? '')}
+                          onChange={e => setAudioTranscripts(prev => ({ ...prev, [iv.id]: e.target.value }))}
+                          placeholder="Transcript de l'entretien..."
+                          rows={7}
+                          className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600 resize-y font-mono leading-relaxed"
+                        />
+                        <div className="flex items-center gap-2 mt-1.5">
+                          {transcriptSavedId === iv.id && (
+                            <span className="text-xs text-green-600 font-medium flex items-center gap-1">
+                              <CheckCircle size={12} /> Enregistré
+                            </span>
+                          )}
+                          <Button size="sm" variant="secondary" loading={savingTranscript === iv.id} onClick={() => saveTranscript(iv.id)}>
+                            <Save size={12} /> Enregistrer le transcript
+                          </Button>
+                        </div>
+                      </div>
                     )}
                   </div>
 
@@ -1026,15 +1092,19 @@ export function CandidateDetailPage() {
                         !(recruiterNotes[iv.id] || iv.recruiter_notes)
                       )}
                     >
-                      <Wand2 size={14} /> Analyser l'entretien avec l'IA
+                      <Wand2 size={14} /> {iv.score !== null ? 'Ré-analyser avec l\'IA' : 'Analyser l\'entretien avec l\'IA'}
                     </Button>
+                    {!(audioTranscripts[iv.id] || iv.audio_transcript) && !(recruiterNotes[iv.id] || iv.recruiter_notes) && (
+                      <p className="text-xs text-slate-400 mt-1.5">Ajoutez des notes ou importez un audio pour activer l'analyse.</p>
+                    )}
                   </div>
 
-                  {/* Score IA + résumé */}
+                  {/* Résultats IA — score global + sous-scores + résumé */}
                   {iv.score !== null && (
-                    <div className="bg-slate-50 rounded-xl p-4 space-y-2">
+                    <div className="bg-slate-50 rounded-2xl p-4 space-y-4">
+                      {/* Score global + avis IA */}
                       <div className="flex items-center gap-3 flex-wrap">
-                        <ScoreDisplay score={iv.score} label="Score" size="sm" />
+                        <ScoreDisplay score={iv.score} label="Score global" size="sm" />
                         {iv.recommendation && (
                           <span className={`text-xs font-bold px-3 py-1.5 rounded-lg ${
                             iv.recommendation === 'GO' ? 'bg-green-100 text-green-700' :
@@ -1045,7 +1115,58 @@ export function CandidateDetailPage() {
                           </span>
                         )}
                       </div>
+
+                      {/* Sous-scores */}
+                      {(iv.score_communication || iv.score_motivation || iv.score_competences || iv.score_pertinence || iv.score_coherence) && (
+                        <div className="space-y-2">
+                          {([
+                            { key: 'score_communication', label: 'Communication', color: 'bg-blue-500' },
+                            { key: 'score_motivation', label: 'Motivation', color: 'bg-purple-500' },
+                            { key: 'score_competences', label: 'Compétences', color: 'bg-green-500' },
+                            { key: 'score_pertinence', label: 'Pertinence des réponses', color: 'bg-orange-500' },
+                            { key: 'score_coherence', label: 'Cohérence du parcours', color: 'bg-teal-500' },
+                          ] as const).map(({ key, label, color }) => {
+                            const val = iv[key]
+                            if (!val) return null
+                            return (
+                              <div key={key}>
+                                <div className="flex items-center justify-between text-xs mb-1">
+                                  <span className="text-slate-600">{label}</span>
+                                  <span className={`font-bold ${val >= 75 ? 'text-green-600' : val >= 50 ? 'text-orange-500' : 'text-red-500'}`}>{val}/100</span>
+                                </div>
+                                <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                  <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${val}%` }} />
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+
+                      {/* Résumé */}
                       {iv.ai_summary && <p className="text-sm text-slate-600 leading-relaxed">{iv.ai_summary}</p>}
+
+                      {/* Points forts / vigilance */}
+                      {(iv.ai_strengths || iv.ai_concerns) && (
+                        <div className="grid sm:grid-cols-2 gap-3">
+                          {iv.ai_strengths && (
+                            <div className="bg-green-50 rounded-xl p-3">
+                              <p className="text-xs font-semibold text-green-700 mb-1.5 flex items-center gap-1">
+                                <CheckCircle size={11} /> Points forts
+                              </p>
+                              <p className="text-xs text-green-800 leading-relaxed">{iv.ai_strengths}</p>
+                            </div>
+                          )}
+                          {iv.ai_concerns && (
+                            <div className="bg-orange-50 rounded-xl p-3">
+                              <p className="text-xs font-semibold text-orange-700 mb-1.5 flex items-center gap-1">
+                                <XCircle size={11} /> Points de vigilance
+                              </p>
+                              <p className="text-xs text-orange-800 leading-relaxed">{iv.ai_concerns}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -1057,11 +1178,11 @@ export function CandidateDetailPage() {
                         <button
                           key={d}
                           onClick={() => saveDecision(iv, d)}
-                          className={`flex-1 py-2 rounded-xl text-sm font-bold border-2 transition-all ${
+                          className={`flex-1 py-2.5 rounded-xl text-sm font-bold border-2 transition-all ${
                             iv.recommendation === d
-                              ? d === 'GO' ? 'bg-green-600 text-white border-green-600'
-                                : d === 'MAYBE' ? 'bg-orange-500 text-white border-orange-500'
-                                : 'bg-red-600 text-white border-red-600'
+                              ? d === 'GO' ? 'bg-green-600 text-white border-green-600 shadow-sm'
+                                : d === 'MAYBE' ? 'bg-orange-500 text-white border-orange-500 shadow-sm'
+                                : 'bg-red-600 text-white border-red-600 shadow-sm'
                               : d === 'GO' ? 'border-green-200 text-green-700 hover:bg-green-50'
                                 : d === 'MAYBE' ? 'border-orange-200 text-orange-700 hover:bg-orange-50'
                                 : 'border-red-200 text-red-700 hover:bg-red-50'
@@ -1074,32 +1195,41 @@ export function CandidateDetailPage() {
                   </div>
 
                   {/* Actions post-décision */}
-                  {iv.recommendation === 'GO' && iv.interview_number < interviewRounds && (
-                    <Button size="sm" onClick={() => openSchedule((iv.interview_number + 1) as 1 | 2 | 3)}>
-                      <CalendarPlus size={14} /> Planifier entretien {iv.interview_number + 1}
-                    </Button>
-                  )}
-                  {iv.recommendation === 'MAYBE' && iv.interview_number < interviewRounds && (
-                    <Button size="sm" variant="secondary" onClick={() => openSchedule((iv.interview_number + 1) as 1 | 2 | 3)}>
-                      <CalendarPlus size={14} /> Planifier entretien {iv.interview_number + 1}
-                    </Button>
-                  )}
-                  {iv.recommendation === 'GO' && iv.interview_number >= interviewRounds && (
-                    <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => openPostDecisionModal(iv, 'hired')}>
-                      <MailCheck size={14} /> Envoyer email d'embauche
-                    </Button>
-                  )}
-                  {iv.recommendation === 'NO' && (
-                    <Button size="sm" variant="danger" onClick={() => openPostDecisionModal(iv, 'rejection')}>
-                      <Mail size={14} /> Envoyer email de refus
-                    </Button>
-                  )}
-
-                  {iv.status === 'scheduled' && (
-                    <div className="pt-1">
-                      <Button size="sm" variant="secondary" onClick={() => markInterviewDone(iv.id)}>
-                        <CheckSquare size={14} className="text-green-600" /> Marquer comme terminé
-                      </Button>
+                  {iv.recommendation && (
+                    <div className="space-y-2">
+                      {/* GO ou MAYBE + pas dernier entretien */}
+                      {(iv.recommendation === 'GO' || iv.recommendation === 'MAYBE') && iv.interview_number < interviewRounds && (
+                        <Button
+                          size="sm"
+                          variant={iv.recommendation === 'GO' ? 'primary' : 'secondary'}
+                          onClick={() => openSchedule((iv.interview_number + 1) as 1 | 2 | 3)}
+                        >
+                          <CalendarPlus size={14} /> Planifier entretien {iv.interview_number + 1}
+                        </Button>
+                      )}
+                      {/* GO + dernier entretien */}
+                      {iv.recommendation === 'GO' && iv.interview_number >= interviewRounds && (
+                        <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => openPostDecisionModal(iv, 'hired')}>
+                          <MailCheck size={14} /> Envoyer email d'embauche 🎉
+                        </Button>
+                      )}
+                      {/* MAYBE + dernier entretien → les deux options */}
+                      {iv.recommendation === 'MAYBE' && iv.interview_number >= interviewRounds && (
+                        <div className="flex gap-2 flex-wrap">
+                          <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => openPostDecisionModal(iv, 'hired')}>
+                            <MailCheck size={14} /> Email d'embauche
+                          </Button>
+                          <Button size="sm" variant="danger" onClick={() => openPostDecisionModal(iv, 'rejection')}>
+                            <Mail size={14} /> Email de refus
+                          </Button>
+                        </div>
+                      )}
+                      {/* NO → refus */}
+                      {iv.recommendation === 'NO' && (
+                        <Button size="sm" variant="danger" onClick={() => openPostDecisionModal(iv, 'rejection')}>
+                          <Mail size={14} /> Envoyer email de refus
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>
